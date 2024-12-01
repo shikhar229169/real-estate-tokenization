@@ -6,9 +6,16 @@ out/
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
+cache_hardhat
+broadcast
+artifacts
 
 # Docs
 docs/
+NOTES.md
 
 # Dotenv file
 .env
+
+# Libs
+node_modules
