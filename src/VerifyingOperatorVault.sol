@@ -13,6 +13,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     // errors
     error VerifyingOperatorVault__AutoUpdateEnabled();
     error VerifyingOperatorVault__InvalidImplementation();
+    error VerifyingOperatorVault__VaultNotEnabled();
 
     // variables
     bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
@@ -26,7 +27,10 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     // events
 
     // modifiers
-
+    modifier vaultEnabled() {
+        require(IRealEstateRegistry(s_registry).getIsVaultApproved(s_operator), VerifyingOperatorVault__VaultNotEnabled());
+        _;
+    }
 
     // constructor
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -47,13 +51,13 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         _grantRole(UPGRADER_ROLE, _registry);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal view override onlyRole(UPGRADER_ROLE) {
+    function _authorizeUpgrade(address newImplementation) internal view override vaultEnabled onlyRole(UPGRADER_ROLE) {
         address _currentImp = IRealEstateRegistry(s_registry).getOperatorVaultImplementation();
         require(_currentImp == newImplementation && newImplementation != i_thisContract, VerifyingOperatorVault__InvalidImplementation());
         require(!s_isAutoUpdateEnabled, VerifyingOperatorVault__AutoUpdateEnabled());
     }
 
-    function toggleAutoUpdate() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function toggleAutoUpdate() external vaultEnabled onlyRole(DEFAULT_ADMIN_ROLE) {
         if (s_isAutoUpdateEnabled) {
             address _currentImp = IRealEstateRegistry(s_registry).getOperatorVaultImplementation();
             if (_currentImp != i_thisContract) {
@@ -70,5 +74,9 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
 
     function getRealEstateRegistry() external view returns (address) {
         return s_registry;
+    }
+
+    function getAllDelegates() external view returns (address[] memory) {
+        return IRealEstateRegistry(s_registry).getDelegates(s_operator);
     }
 }

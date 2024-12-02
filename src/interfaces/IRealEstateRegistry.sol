@@ -33,6 +33,7 @@ interface IRealEstateRegistry {
     function getDataFeedForToken(address _token) external view returns (address);
     function getDelegates(address _operator) external view returns (address[] memory);
     function getFiatCollateralRequiredForOperator() external view returns (uint256);
+    function getIsVaultApproved(address _operator) external view returns (bool);
     function getMaxDelegates() external view returns (uint256);
     function getMaxOpFiatCollateral() external pure returns (uint256);
     function getMinDelegates() external view returns (uint256);

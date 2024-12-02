@@ -243,6 +243,10 @@ contract RealEstateRegistry is AccessControl {
         return s_operators[_operator].vault;
     }
 
+    function getIsVaultApproved(address _operator) external view returns (bool) {
+        return s_operators[_operator].isApproved;
+    }
+
     function getOperatorENSName(address _operator) external view returns (string memory) {
         return s_operators[_operator].ensName;
     }
