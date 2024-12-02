@@ -1,7 +1,7 @@
 {
   "name": "real-estate-tokenization",
   "version": "1.0.0",
-  "author": "shikhar229 <shikharagarwale7@gmail.com>",
+  "author": "shikhar229169 <shikharagarwale7@gmail.com>",
   "license": "MIT",
   "devDependencies": {
     "@chainlink/contracts": "^1.3.0",
