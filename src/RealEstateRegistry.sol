@@ -7,6 +7,7 @@ import { ERC1967ProxyAutoUp } from "./ERC1967ProxyAutoUp.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { IVerifyingOperatorVault } from "./interfaces/IVerifyingOperatorVault.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
@@ -27,6 +28,7 @@ contract RealEstateRegistry is AccessControl {
     error RealEstateRegistry__InvalidDelegates();
     error RealEstateRegistry__ENSNameAlreadyExist();
     error RealEstateRegistry__InvalidENSName();
+    error RealEstateRegistry__NativeNotRequired();
 
     // structs
     struct OperatorInfo {
@@ -37,11 +39,13 @@ contract RealEstateRegistry is AccessControl {
         uint256 stakedCollateralInToken;
         address token;
         uint256 timestamp;
+        bool isApproved;
     }
 
     // variables
     bytes32 public constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
     bytes32 public constant SETTER_ROLE = keccak256("SETTER_ROLE");
+    bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
 
     uint256 private constant MIN_OP_FIAT_COLLATERAL = 40_000;
     uint256 private constant MAX_OP_FIAT_COLLATERAL = 1_20_000;
@@ -58,6 +62,7 @@ contract RealEstateRegistry is AccessControl {
     // events
     event CollateralUpdated(uint256 newCollateral);
     event OperatorVaultRegistered(address operator, address vault);
+    event OperatorVaultApproved(address approver, address operator);
 
     // modifiers
     modifier onlyAcceptedToken(address _token) {
@@ -73,6 +78,7 @@ contract RealEstateRegistry is AccessControl {
         _grantRole(SLASHER_ROLE, msg.sender);
         _grantRole(SLASHER_ROLE, _slasher);
         _grantRole(SETTER_ROLE, msg.sender);
+        _grantRole(APPROVER_ROLE, msg.sender);
 
         s_fiatCollateralRequiredForOperator = _collateralReqInFiat;
         s_minDelegates = _minDelegates;
@@ -105,7 +111,7 @@ contract RealEstateRegistry is AccessControl {
      * 
      * @param _paymentToken The payment token in which collateral will be collected, address(0) for native token
      */
-    function depositCollateralAndRegisterVault(address[] memory _delegates, string memory _ensName, address _paymentToken) external onlyAcceptedToken(_paymentToken) payable {
+    function depositCollateralAndRegisterVault(address[] memory _delegates, string memory _ensName, address _paymentToken, bool _autoUpdateEnabled) external onlyAcceptedToken(_paymentToken) payable {
         require(!_isOperatorExist(msg.sender), RealEstateRegistry__OperatorAlreadyExist());
         require(_delegates.length >= s_minDelegates && _delegates.length <= s_maxDelegates, RealEstateRegistry__InvalidDelegates());
         require(s_ensToOperator[_ensName] == address(0), RealEstateRegistry__ENSNameAlreadyExist());
@@ -120,13 +126,16 @@ contract RealEstateRegistry is AccessControl {
             refundAmount = msg.value - tokenAmountRequired;
         }
         else {
+            require(msg.value == 0, RealEstateRegistry__NativeNotRequired());
             IERC20(_paymentToken).safeTransferFrom(msg.sender, address(this), tokenAmountRequired);
         }
 
         s_ensToOperator[_ensName] = msg.sender;
 
-        // @todo populate data field
-        ERC1967ProxyAutoUp _vaultProxy = new ERC1967ProxyAutoUp{ salt: bytes32(uint256(uint160(msg.sender))) }(s_verifyingOpVaultImplementation, "");
+        bytes32 _deploySalt = bytes32(uint256(uint160(msg.sender)));
+        bytes memory _deployInitData = abi.encodeWithSelector(IVerifyingOperatorVault.initialize.selector, msg.sender, address(this), _paymentToken, _autoUpdateEnabled);
+        ERC1967ProxyAutoUp _vaultProxy = new ERC1967ProxyAutoUp{ salt: _deploySalt }(s_verifyingOpVaultImplementation, _deployInitData);
+
         emit OperatorVaultRegistered(msg.sender, address(_vaultProxy));
 
         s_operators[msg.sender] = OperatorInfo({
@@ -136,13 +145,27 @@ contract RealEstateRegistry is AccessControl {
             stakedCollateralInFiat: s_fiatCollateralRequiredForOperator,
             stakedCollateralInToken: tokenAmountRequired,
             token: _paymentToken,
-            timestamp: block.timestamp
+            timestamp: block.timestamp,
+            isApproved: false
         });
 
         if (refundAmount > 0) {
             (bool s, ) = payable(msg.sender).call{ value: refundAmount }("");
             require(s, RealEstateRegistry__TransferFailed());
         }
+    }
+
+    function approveOperatorVault(string memory _operatorVaultEns) external onlyRole(APPROVER_ROLE) {
+        address _operator = s_ensToOperator[_operatorVaultEns];
+        require(_operator != address(0), RealEstateRegistry__InvalidENSName());
+        s_operators[_operator].isApproved = true;
+        emit OperatorVaultApproved(msg.sender, _operator);
+    }
+
+    function forceUpdateOperatorVault(string memory _operatorVaultEns) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address _operator = s_ensToOperator[_operatorVaultEns];
+        require(_operator != address(0), RealEstateRegistry__InvalidENSName());
+        IVerifyingOperatorVault(_operator).upgradeToAndCall(s_verifyingOpVaultImplementation, "");
     }
 
     // @todo implement

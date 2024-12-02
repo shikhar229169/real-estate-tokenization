@@ -7,6 +7,7 @@ import { Initializable } from "@openzeppelin/contracts-upgradeable/proxy/utils/I
 import { UUPSUpgradeable } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import { StorageSlot } from "@openzeppelin/contracts/utils/StorageSlot.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     // errors
@@ -18,6 +19,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
     address private s_operator;
     address private s_registry;
+    address private s_token;
     bool private s_isAutoUpdateEnabled;
     address private immutable i_thisContract;
 
@@ -33,11 +35,12 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         _disableInitializers();
     }
 
-    function initialize(address _operator, address _registry, bool _isAutoUpdateEnabled) public initializer {
+    function initialize(address _operator, address _registry, address _token, bool _isAutoUpdateEnabled) public initializer {
         __UUPSUpgradeable_init();
         __AccessControl_init();
         s_operator = _operator;
         s_registry = _registry;
+        s_token = _token;
         s_isAutoUpdateEnabled = _isAutoUpdateEnabled;
         _grantRole(DEFAULT_ADMIN_ROLE, _operator);
         _grantRole(UPGRADER_ROLE, _operator);
