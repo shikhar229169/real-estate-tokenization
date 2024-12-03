@@ -127,7 +127,13 @@ contract RealEstateRegistry is AccessControl, EIP712 {
      * 
      * @param _paymentToken The payment token in which collateral will be collected, address(0) for native token
      */
-    function depositCollateralAndRegisterVault(address[] memory _delegates, string memory _ensName, address _paymentToken, bytes memory _signature, bool _autoUpdateEnabled) external onlyAcceptedToken(_paymentToken) payable {
+    function depositCollateralAndRegisterVault(
+        address[] memory _delegates, 
+        string memory _ensName, 
+        address _paymentToken, 
+        bytes memory _signature, 
+        bool _autoUpdateEnabled
+    ) external onlyAcceptedToken(_paymentToken) payable {
         require(!_isOperatorExist(msg.sender), RealEstateRegistry__OperatorAlreadyExist());
         require(_delegates.length >= s_minDelegates && _delegates.length <= s_maxDelegates, RealEstateRegistry__InvalidDelegates());
         require(s_ensToOperator[_ensName] == address(0), RealEstateRegistry__ENSNameAlreadyExist());
