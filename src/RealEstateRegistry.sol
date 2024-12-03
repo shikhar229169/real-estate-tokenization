@@ -8,13 +8,15 @@ import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/inte
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IVerifyingOperatorVault } from "./interfaces/IVerifyingOperatorVault.sol";
+import { EIP712 } from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import { ECDSA } from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
 }
 
 /// @notice This is the on-chain registry and manages the operators and atm
-contract RealEstateRegistry is AccessControl {
+contract RealEstateRegistry is AccessControl, EIP712 {
     // libraries
     using SafeERC20 for IERC20;
 
@@ -29,6 +31,7 @@ contract RealEstateRegistry is AccessControl {
     error RealEstateRegistry__ENSNameAlreadyExist();
     error RealEstateRegistry__InvalidENSName();
     error RealEstateRegistry__NativeNotRequired();
+    error RealEstateRegistry__InvalidSignature();
 
     // structs
     struct OperatorInfo {
@@ -46,6 +49,9 @@ contract RealEstateRegistry is AccessControl {
     bytes32 public constant SLASHER_ROLE = keccak256("SLASHER_ROLE");
     bytes32 public constant SETTER_ROLE = keccak256("SETTER_ROLE");
     bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
+    bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
+
+    bytes32 private constant REGISTER_VAULT_TYPE_HASH = keccak256("REGISTER_VAULT(address[] delegates, string ensName)");
 
     uint256 private constant MIN_OP_FIAT_COLLATERAL = 40_000;
     uint256 private constant MAX_OP_FIAT_COLLATERAL = 1_20_000;
@@ -71,7 +77,16 @@ contract RealEstateRegistry is AccessControl {
     }
 
     // constructor
-    constructor(address _slasher, uint256 _collateralReqInFiat, address[] memory _acceptedTokens, address[] memory _dataFeeds, uint256 _minDelegates, uint256 _maxDelegates, address _verifyingOpVaultImplementation) {
+    constructor(
+        address _slasher,
+        address _signer, 
+        uint256 _collateralReqInFiat, 
+        address[] memory _acceptedTokens, 
+        address[] memory _dataFeeds, 
+        uint256 _minDelegates, 
+        uint256 _maxDelegates, 
+        address _verifyingOpVaultImplementation
+    ) EIP712("RealEstateRegistry", "1.0.0") {
         require(_acceptedTokens.length == _dataFeeds.length, RealEstateRegistry__InvalidDataFeeds());
 
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -79,6 +94,7 @@ contract RealEstateRegistry is AccessControl {
         _grantRole(SLASHER_ROLE, _slasher);
         _grantRole(SETTER_ROLE, msg.sender);
         _grantRole(APPROVER_ROLE, msg.sender);
+        _grantRole(SIGNER_ROLE, _signer);
 
         s_fiatCollateralRequiredForOperator = _collateralReqInFiat;
         s_minDelegates = _minDelegates;
@@ -111,12 +127,18 @@ contract RealEstateRegistry is AccessControl {
      * 
      * @param _paymentToken The payment token in which collateral will be collected, address(0) for native token
      */
-    function depositCollateralAndRegisterVault(address[] memory _delegates, string memory _ensName, address _paymentToken, bool _autoUpdateEnabled) external onlyAcceptedToken(_paymentToken) payable {
+    function depositCollateralAndRegisterVault(address[] memory _delegates, string memory _ensName, address _paymentToken, bytes memory _signature, bool _autoUpdateEnabled) external onlyAcceptedToken(_paymentToken) payable {
         require(!_isOperatorExist(msg.sender), RealEstateRegistry__OperatorAlreadyExist());
         require(_delegates.length >= s_minDelegates && _delegates.length <= s_maxDelegates, RealEstateRegistry__InvalidDelegates());
         require(s_ensToOperator[_ensName] == address(0), RealEstateRegistry__ENSNameAlreadyExist());
         require(bytes(_ensName).length > 0, RealEstateRegistry__InvalidENSName());
         _revertIfContainsDup(_delegates);
+
+        _verifyHashWithRole(
+            prepareRegisterVaultHash(_delegates, _ensName), 
+            _signature, 
+            SIGNER_ROLE
+        );
 
         uint256 tokenAmountRequired = _getAmountRequiredForToken(_paymentToken);
         uint256 refundAmount;
@@ -175,6 +197,23 @@ contract RealEstateRegistry is AccessControl {
 
     function slashOperatorVault(string memory _ensName) external onlyRole(SLASHER_ROLE) {
         
+    }
+
+    function prepareRegisterVaultHash(address[] memory _delegates, string memory _ensName) public view returns (bytes32) {
+        bytes32 structHash = keccak256(
+            abi.encode(
+                REGISTER_VAULT_TYPE_HASH, 
+                keccak256(abi.encodePacked(_delegates)), 
+                keccak256(abi.encodePacked(_ensName))
+            )
+        );
+
+        return _hashTypedDataV4(structHash);
+    }
+
+    function _verifyHashWithRole(bytes32 _signedMessageHash, bytes memory _signature, bytes32 _role) internal view {
+        address _signer = ECDSA.recover(_signedMessageHash, _signature);
+        require(hasRole(_role, _signer), RealEstateRegistry__InvalidSignature());
     }
 
     function _getAmountRequiredForToken(address _token) internal view returns(uint256 requiredAmount) {
