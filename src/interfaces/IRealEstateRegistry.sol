@@ -17,6 +17,7 @@ interface IRealEstateRegistry {
     function APPROVER_ROLE() external view returns (bytes32);
     function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
     function SETTER_ROLE() external view returns (bytes32);
+    function SIGNER_ROLE() external view returns (bytes32);
     function SLASHER_ROLE() external view returns (bytes32);
     function addCollateralToken(address _newToken, address _dataFeed) external;
     function approveOperatorVault(string memory _operatorVaultEns) external;
@@ -24,8 +25,21 @@ interface IRealEstateRegistry {
         address[] memory _delegates,
         string memory _ensName,
         address _paymentToken,
+        bytes memory _signature,
         bool _autoUpdateEnabled
     ) external payable;
+    function eip712Domain()
+        external
+        view
+        returns (
+            bytes1 fields,
+            string memory name,
+            string memory version,
+            uint256 chainId,
+            address verifyingContract,
+            bytes32 salt,
+            uint256[] memory extensions
+        );
     function emergencyWithdrawToken(address _token) external;
     function fixCollateral() external payable;
     function forceUpdateOperatorVault(string memory _operatorVaultEns) external;
@@ -44,11 +58,17 @@ interface IRealEstateRegistry {
     function getOperatorVault(address _operator) external view returns (address);
     function getOperatorVaultImplementation() external view returns (address);
     function getRoleAdmin(bytes32 role) external view returns (bytes32);
+    function getSwapRouter() external view returns (address);
     function grantRole(bytes32 role, address account) external;
     function hasRole(bytes32 role, address account) external view returns (bool);
+    function prepareRegisterVaultHash(address[] memory _delegates, string memory _ensName)
+        external
+        view
+        returns (bytes32);
     function renounceRole(bytes32 role, address callerConfirmation) external;
     function revokeRole(bytes32 role, address account) external;
     function setCollateralRequiredForOperator(uint256 _newOperatorCollateral) external;
+    function setSwapRouter(address _swapRouter) external;
     function slashOperatorVault(string memory _ensName) external;
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
     function updateVOVImplementation(address _newVerifyingOpVaultImplementation) external;

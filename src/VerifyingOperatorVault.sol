@@ -9,6 +9,12 @@ import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/ac
 import { StorageSlot } from "@openzeppelin/contracts/utils/StorageSlot.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { ISwapRouter } from "./interfaces/ISwapRouter.sol";
+
+interface IERC20Decimals {
+    function decimals() external view returns (uint8);
+}
 
 contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControlUpgradeable {
     using SafeERC20 for IERC20;
@@ -20,6 +26,8 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     error VerifyingOperatorVault__NotAuthorized();
     error VerifyingOperatorVault__PendingDepositsNotUnlocked();
     error VerifyingOperatorVault__WithdrawDeadlineNotReached();
+    error VerifyingOperatorVault__InvalidToken();
+    error VerifyingOperatorVault__IncorrectSlippage();
 
     // structs
     struct UserDepositInfo {
@@ -49,6 +57,10 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     uint256 private s_totalStakedDeposit;
     uint256 private rewardPerTokenStored;
     uint256 private s_stakeDelay;
+    uint256 private s_maxSlippage;
+    uint256 private HUNDRED_PC = 100e18;
+    uint256 private constant SWAP_DEADLINE_DELAY = 10 minutes;
+    uint24 private constant FEE = 3000;
 
     // events
     event StakeDelayUpdated(uint256 newStakedDelay);
@@ -58,6 +70,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     event WithdrawPending(uint256 amount, uint256 deadline);
     event StakeWithdrawn(uint256 amount);
     event RewardClaimed(address user, uint256 amount);
+    event SlippageUpdated(uint256 newSlippage);
 
     // modifiers
     modifier vaultEnabled() {
@@ -78,6 +91,11 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         _;
     }
 
+    modifier onlyOperator() {
+        require(msg.sender == s_operator, VerifyingOperatorVault__NotAuthorized());
+        _;
+    }
+
     // constructor
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -93,6 +111,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         s_token = _token;
         s_isAutoUpdateEnabled = _isAutoUpdateEnabled;
         s_stakeDelay = 1 weeks;
+        s_maxSlippage = 3e18;
         _grantRole(DEFAULT_ADMIN_ROLE, _operator);
         _grantRole(UPGRADER_ROLE, _operator);
         _grantRole(UPGRADER_ROLE, _registry);
@@ -121,6 +140,12 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         emit StakeDelayUpdated(_newStakeDelay);
     }
 
+    function setMaxSlippage(uint256 _newSlippage) external onlyOperator {
+        require(_newSlippage <= HUNDRED_PC, VerifyingOperatorVault__IncorrectSlippage());
+        s_maxSlippage = _newSlippage;
+        emit SlippageUpdated(_newSlippage);
+    }
+
     function stakeCollateral(uint256 _amount) external vaultEnabled {
         require(_amount > 0, "Amount must be greater than 0");
         _unlockPendingDeposits(msg.sender, false);
@@ -133,12 +158,23 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         IERC20(s_token).safeTransferFrom(msg.sender, address(this), _amount);
     }
 
-    // @todo
-    function receiveRewards() external {
-        // the token the rewards will be received in
-        // but the vault deals with a specific token, required to be swap
-        // 40% to operator - make it available to operator
-        // 60% among users - make it available here in this contract by updaing rewardPerTokenStored
+    // @todo should only be callable by owned party
+    function receiveRewards(address _rewardToken, uint256 _amount) external {
+        uint256 _receivedAmount = _amount;
+
+        if (_rewardToken != s_token) {
+            uint256 vaultNativeTokenPrice = getPriceFromTokenToAnotherToken(_rewardToken, s_token, _amount);
+            uint256 minReceived = ((HUNDRED_PC - s_maxSlippage) * vaultNativeTokenPrice) / HUNDRED_PC;
+            _receivedAmount = _performSwap(_rewardToken, s_token, _amount, minReceived);
+        }
+
+        uint256 operatorClaimable = (40e18 * _receivedAmount) / HUNDRED_PC;
+        uint256 toDistributeAmongStakers = _receivedAmount - operatorClaimable;
+        uint256 decimalsAdjusted = 10 ** IERC20Decimals(s_token).decimals();
+
+        s_userClaimableReward[s_operator] += operatorClaimable;
+        // @todo cover the case for s_totalStakedDeposit being 0
+        rewardPerTokenStored += (toDistributeAmongStakers * decimalsAdjusted) / s_totalStakedDeposit;
     }
 
     function withdrawStake(uint256 _amount) external vaultEnabled {
@@ -178,7 +214,6 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         _unlockPendingDeposits(msg.sender, true);
     }
 
-
     function _unlockPendingDeposits(address _user, bool _toRevert) internal updateUserRewards(_user) {
         UserDepositInfo storage _info = s_userDepositInfo[_user];
         if (block.timestamp >= _info.pendingAmountInclusionTime) {
@@ -190,6 +225,72 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         else if (_toRevert) {
             revert VerifyingOperatorVault__PendingDepositsNotUnlocked();
         }
+    }
+
+    function getPriceFromTokenToAnotherToken(address _tokenA, address _tokenB, uint256 _tokenAmountA) public view returns (uint256) {
+        AggregatorV3Interface pfA = AggregatorV3Interface(IRealEstateRegistry(s_registry).getDataFeedForToken(_tokenA));
+        AggregatorV3Interface pfB = AggregatorV3Interface(IRealEstateRegistry(s_registry).getDataFeedForToken(_tokenB));
+
+        require(address(pfA) != address(0) && address(pfB) != address(0), VerifyingOperatorVault__InvalidToken());
+
+        uint256 aDecimals;
+        uint256 bDecimals;
+
+        if (_tokenA == address(0)) {
+            aDecimals = 18;
+        }
+        else {
+            aDecimals = IERC20Decimals(_tokenA).decimals();
+        }
+
+        if (_tokenB == address(0)) {
+            bDecimals = 18;
+        }
+        else {
+            bDecimals = IERC20Decimals(_tokenB).decimals();
+        }
+
+        (, int256 priceA, , , ) = pfA.latestRoundData();
+        (, int256 priceB, , , ) = pfB.latestRoundData();
+        uint8 decimalsPfA = pfA.decimals();
+        uint8 decimalsPfB = pfB.decimals();
+
+        // 1 A = x usd
+        // 1 B = y usd
+        // y usd = 1 B
+        // x usd = x / y B
+        // 1 A = x / y B
+        // k A = (k * x) / y B
+        // num -> decPfB + decB
+        // dem -> decPfA + decA
+
+        uint256 num = 10 ** (bDecimals + decimalsPfB);
+        uint256 den = 10 ** (aDecimals + decimalsPfA);
+        uint256 amountB = (_tokenAmountA * uint256(priceA) * num) / (uint256(priceB) * den);
+        return amountB;
+    }
+
+    function _performSwap(address _inToken, address _outToken, uint256 _amount, uint256 _minOut) internal returns (uint256 _amountOut) {
+        // if (_inToken == address(0)) IWETH(weth).deposit{value: _amount}();
+        ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
+            tokenIn: _inToken,
+            tokenOut: _outToken,
+            fee: FEE,
+            recipient: address(this),
+            deadline: block.timestamp + SWAP_DEADLINE_DELAY,
+            amountIn: _amount,
+            amountOutMinimum: _minOut,
+            sqrtPriceLimitX96: 0
+        });
+
+        address _swapRouter = IRealEstateRegistry(s_registry).getSwapRouter();
+
+        IERC20(_inToken).approve(_swapRouter, params.amountIn);
+        _amountOut = ISwapRouter(_swapRouter).exactInputSingle(params);
+
+        // if (_outToken == NATIVE) {
+        //     IWETH(weth).withdraw(_amountOut);
+        // }
     }
 
     function isAutoUpdateEnabled() external view returns (bool) {

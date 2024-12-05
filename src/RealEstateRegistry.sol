@@ -64,6 +64,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     address[] private s_acceptedTokens;
     address private s_verifyingOpVaultImplementation;
     mapping(address => bool) private s_usedDelegatesMap;
+    address private s_swapRouter;
 
     // events
     event CollateralUpdated(uint256 newCollateral);
@@ -85,7 +86,8 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         address[] memory _dataFeeds, 
         uint256 _minDelegates, 
         uint256 _maxDelegates, 
-        address _verifyingOpVaultImplementation
+        address _verifyingOpVaultImplementation,
+        address _swapRouter
     ) EIP712("RealEstateRegistry", "1.0.0") {
         require(_acceptedTokens.length == _dataFeeds.length, RealEstateRegistry__InvalidDataFeeds());
 
@@ -100,6 +102,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         s_minDelegates = _minDelegates;
         s_maxDelegates = _maxDelegates;
         s_verifyingOpVaultImplementation = _verifyingOpVaultImplementation;
+        s_swapRouter = _swapRouter;
         for (uint256 i; i < _acceptedTokens.length; i++) {
             s_acceptedTokens.push(_acceptedTokens[i]);
             s_tokenToDataFeeds[_acceptedTokens[i]] = _dataFeeds[i];
@@ -121,6 +124,10 @@ contract RealEstateRegistry is AccessControl, EIP712 {
 
     function updateVOVImplementation(address _newVerifyingOpVaultImplementation) external onlyRole(SETTER_ROLE) {
         s_verifyingOpVaultImplementation = _newVerifyingOpVaultImplementation;
+    }
+
+    function setSwapRouter(address _swapRouter) external onlyRole(SETTER_ROLE) {
+        s_swapRouter = _swapRouter;
     }
 
     /**
@@ -308,6 +315,10 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         return s_maxDelegates;
     }
 
+    function getSwapRouter() external view returns (address) {
+        return s_swapRouter;
+    }
+
     function getMinOpFiatCollateral() external pure returns (uint256) {
         return MIN_OP_FIAT_COLLATERAL;
     }
@@ -315,4 +326,5 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     function getMaxOpFiatCollateral() external pure returns (uint256) {
         return MAX_OP_FIAT_COLLATERAL;
     }
+
 }
