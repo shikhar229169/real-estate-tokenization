@@ -159,22 +159,48 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     }
 
     // @todo should only be callable by owned party
-    function receiveRewards(address _rewardToken, uint256 _amount) external {
-        uint256 _receivedAmount = _amount;
+    /**
+     * 
+     * @return uint256 - receivedAmount: The amount of reward token utilized (ensuring TRE uses them back for incentive pool of real estate token holders)
+     */
+    function receiveRewards(address _rewardToken, uint256 _amount) external returns (uint256) {
+        uint256 _receivedAmount;
+        uint256 _receivedAmountVaultNative;
 
-        if (_rewardToken != s_token) {
-            uint256 vaultNativeTokenPrice = getPriceFromTokenToAnotherToken(_rewardToken, s_token, _amount);
-            uint256 minReceived = ((HUNDRED_PC - s_maxSlippage) * vaultNativeTokenPrice) / HUNDRED_PC;
-            _receivedAmount = _performSwap(_rewardToken, s_token, _amount, minReceived);
+        if (s_totalStakedDeposit > 0) {
+            _receivedAmount = _amount;
+        }
+        else {
+            _receivedAmount = (40e18 * _amount) / HUNDRED_PC;
         }
 
-        uint256 operatorClaimable = (40e18 * _receivedAmount) / HUNDRED_PC;
-        uint256 toDistributeAmongStakers = _receivedAmount - operatorClaimable;
-        uint256 decimalsAdjusted = 10 ** IERC20Decimals(s_token).decimals();
+        IERC20(_rewardToken).safeTransferFrom(msg.sender, address(this), _receivedAmount);
 
-        s_userClaimableReward[s_operator] += operatorClaimable;
-        // @todo cover the case for s_totalStakedDeposit being 0
-        rewardPerTokenStored += (toDistributeAmongStakers * decimalsAdjusted) / s_totalStakedDeposit;
+        if (_rewardToken != s_token) {
+            uint256 vaultNativeTokenPrice = getPriceFromTokenToAnotherToken(_rewardToken, s_token, _receivedAmount);
+            uint256 minReceived = ((HUNDRED_PC - s_maxSlippage) * vaultNativeTokenPrice) / HUNDRED_PC;
+            _receivedAmountVaultNative = _performSwap(_rewardToken, s_token, _receivedAmount, minReceived);
+        }
+        else {
+            _receivedAmountVaultNative = _receivedAmount;
+        }
+
+        if (s_totalStakedDeposit > 0) {
+            // 40% to operator, rest 60% among collateral stakers
+            uint256 operatorClaimable = (40e18 * _receivedAmountVaultNative) / HUNDRED_PC;
+            uint256 toDistributeAmongStakers = _receivedAmountVaultNative - operatorClaimable;
+            uint256 decimalsAdjusted = 10 ** IERC20Decimals(s_token).decimals();
+
+            s_userClaimableReward[s_operator] += operatorClaimable;
+            rewardPerTokenStored += (toDistributeAmongStakers * decimalsAdjusted) / s_totalStakedDeposit;
+        }
+        else {
+            // no collateral staked by users, then 40% go to operator
+            /// @dev the rest 60% is not transferred in here, and it will be added to the real estate token holders incetive pool
+            s_userClaimableReward[s_operator] += _receivedAmountVaultNative;
+        }
+
+        return _receivedAmount;
     }
 
     function withdrawStake(uint256 _amount) external vaultEnabled {
