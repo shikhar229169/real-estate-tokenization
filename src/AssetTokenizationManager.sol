@@ -33,10 +33,10 @@ contract AssetTokenizationManager is ERC721 {
     
     uint256 private constant MAX_DECIMALS_SHARE_PERCENTAGE = 5;
     mapping(uint256 => AssetInfo) private s_tokenidToAssetInfo;
-    mapping(address => shareHolderInfo) private s_shareHolderToShareHolderInfo;
+    // mapping(address => shareHolderInfo) private s_shareHolderToShareHolderInfo;
     uint256 private s_tokenId;
-    mapping(address => bool) private s_isShareholder;
-    mapping(address => uint256) private s_shareholderToShares;
+    // mapping(address => bool) private s_isShareholder;
+    // mapping(address => uint256) private s_shareholderToShares;
     address private immutable i_assetTokenizedRealEsate;
     uint256 private constant TOTAL_TRE = 1e6 * 1e18;
 
@@ -52,14 +52,6 @@ contract AssetTokenizationManager is ERC721 {
         _;
     }
 
-    modifier onlySharesHolder(){
-        if (msg.sender != s_shareHolderToShareHolderInfo[msg.sender].shareholder) {
-            revert AssetTokenizationManager__NotShareHolder();
-
-        }
-        _;
-    }
-
     constructor(address ethUsdcPriceFeeds, address crossChainManager)
         ERC721("Asset Tokenization Manager", "ATM")
     {
@@ -69,7 +61,8 @@ contract AssetTokenizationManager is ERC721 {
 
     function mintAssetTokenizedRealEstateForEth(uint256 percentageForShareholders, uint256 amountOfAsset) external {
         _mint(msg.sender, s_tokenId);
-        address tokenizedRealEstate = address(new TokenizedRealEstate(address(this), address(i_crossChainManager)));
+        address tokenizedRealEstate = address(new TokenizedRealEstate(address(this), address(i_crossChainManager), msg.sender, amountOfAsset, percentageForShareholders, s_tokenId));
+
         TokenizedRealEstate(tokenizedRealEstate).mintTokenizedRealEstateForEth();
         uint256 netAmountForShares = _calculateNetAmountForShares(percentageForShareholders, amountOfAsset);
         s_tokenidToAssetInfo[s_tokenId] = AssetInfo({
@@ -80,52 +73,14 @@ contract AssetTokenizationManager is ERC721 {
             currRentAmount: 0,
             netAmountForShareholders: netAmountForShares
         });
+        TokenizedRealEstate(tokenizedRealEstate).updateAssetInfo(s_tokenId);
         s_tokenId++;
-    }
-
-    function buySharesOfAsset(uint256 tokenid, uint256 amount) external payable {
-        // if (msg.value != amount) {
-        //     // revert AssetTokenizationManager__();
-        // }
-        uint256 amountOfToken = _calculateNetTokenAmount(amount, s_tokenidToAssetInfo[tokenid].netAmountForShareholders);
-        s_shareHolderToShareHolderInfo[msg.sender] = shareHolderInfo({
-            tokenId: tokenid,
-            shareholder: msg.sender,
-            sharesAmount: amount,
-            fractionalShares: amountOfToken,
-            rentAmountIn: s_tokenidToAssetInfo[tokenid].currRentAmount
-        });
-        address tokenTRE = s_tokenidToAssetInfo[tokenid].token;
-        address assetOwner = s_tokenidToAssetInfo[tokenid].assetOwner;
-        
-        IERC20(tokenTRE).transferFrom(assetOwner, msg.sender, amountOfToken);
-    }
-
-    function sellSharesOfAsset(uint256 tokenid) external onlySharesHolder {
-        
-        uint256 rentAmount = s_shareHolderToShareHolderInfo[msg.sender].rentAmountIn;
-        uint256 currRentAmount = s_tokenidToAssetInfo[tokenid].currRentAmount;
-        uint256 amount = currRentAmount - rentAmount;
-        
-        uint256 tokenAmount = s_shareHolderToShareHolderInfo[msg.sender].fractionalShares;
-        address tokenTRE = s_tokenidToAssetInfo[tokenid].token;
-        address assetOwner = s_tokenidToAssetInfo[tokenid].assetOwner;
-        
-        s_shareHolderToShareHolderInfo[msg.sender] = shareHolderInfo({
-            tokenId: tokenid,
-            shareholder: address(0),
-            sharesAmount: 0,
-            fractionalShares: 0,
-            rentAmountIn: 0
-        });
-
-        bool success = payable(msg.sender).send(amount);
-        require(success);
-        IERC20(tokenTRE).transferFrom(msg.sender,assetOwner , tokenAmount);
     }
 
     function updateRentAmount(uint256 tokenid, uint256 rentAmount) external onlyAssetOwner(tokenid) {
         s_tokenidToAssetInfo[tokenid].currRentAmount = rentAmount;
+        address tokenizedRealEstate = s_tokenidToAssetInfo[tokenid].token;
+        TokenizedRealEstate(tokenizedRealEstate).updateAssetInfoRentAmount(s_tokenId, rentAmount);
     }
 
     function _calculateNetAmountForShares(uint256 percentageForShareholders, uint256 amountOfAsset)
@@ -146,9 +101,5 @@ contract AssetTokenizationManager is ERC721 {
 
     function getAssetInfo(uint256 tokenId) external view returns (AssetInfo memory) {
         return s_tokenidToAssetInfo[tokenId];
-    }
-
-    function getShareHolderInfo(address shareholder) external view returns (shareHolderInfo memory) {
-        return s_shareHolderToShareHolderInfo[shareholder];
     }
 }
