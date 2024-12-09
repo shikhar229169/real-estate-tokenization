@@ -64,17 +64,20 @@ contract TokenizedRealEstate is ERC20 {
         // if (msg.value != amount) {
         //     // revert AssetTokenizationManager__();
         // }
-        uint256 amountOfToken = _calculateNetTokenAmount(amount, s_tokenidToAssetInfo[i_tokenId].netAmountForShareholders);
+
+        uint256 netAmount = s_shareHolderToShareHolderInfo[msg.sender].sharesAmount+amount;
+        uint256 prevAmountOfToken = s_shareHolderToShareHolderInfo[msg.sender].fractionalShares;
+        uint256 amountOfToken = _calculateNetTokenAmount(netAmount, s_tokenidToAssetInfo[i_tokenId].netAmountForShareholders);
 
         s_shareHolderToShareHolderInfo[msg.sender] = shareHolderInfo({
             tokenId: i_tokenId,
             shareholder: msg.sender,
-            sharesAmount: amount,
+            sharesAmount: netAmount,
             fractionalShares: amountOfToken,
             rentAmountIn: s_tokenidToAssetInfo[i_tokenId].currRentAmount
         });
-        
-        transferFrom(i_assetOwner, msg.sender, amountOfToken);
+        uint256 netAmountOfTOken = amountOfToken-prevAmountOfToken;
+        transferFrom(i_assetOwner, msg.sender, netAmountOfTOken);
     }
 
     function sellSharesOfAsset(uint256 tokenid) external onlySharesHolder {
