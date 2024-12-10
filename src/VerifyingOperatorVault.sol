@@ -50,6 +50,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     address private s_token;
     bool private s_isAutoUpdateEnabled;
     address private immutable i_thisContract;
+    address[] private s_tokenizedRealEstateAddresses;
 
     mapping(address user => UserDepositInfo) private s_userDepositInfo;
     mapping(address user => uint256 claim) private s_userClaimableReward;
@@ -71,6 +72,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     event StakeWithdrawn(uint256 amount);
     event RewardClaimed(address user, uint256 amount);
     event SlippageUpdated(uint256 newSlippage);
+    event TokenizedRealEstateAdded(address tokenizedRealEstate);
 
     // modifiers
     modifier vaultEnabled() {
@@ -93,6 +95,11 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
 
     modifier onlyOperator() {
         require(msg.sender == s_operator, VerifyingOperatorVault__NotAuthorized());
+        _;
+    }
+
+    modifier onlyTokenizationManager {
+        require(msg.sender == IRealEstateRegistry(s_registry).getAssetTokenizationManager(), VerifyingOperatorVault__NotAuthorized());
         _;
     }
 
@@ -158,12 +165,11 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         IERC20(s_token).safeTransferFrom(msg.sender, address(this), _amount);
     }
 
-    // @todo should only be callable by owned party
     /**
-     * 
-     * @return uint256 - receivedAmount: The amount of reward token utilized (ensuring TRE uses them back for incentive pool of real estate token holders)
+     * @dev the respective tokenized real estate contract approves this contract to spend the reward tokens
+     * @return utilizedAmount The amount of reward token utilized (ensuring TRE uses them back for incentive pool of real estate token holders)
      */
-    function receiveRewards(address _rewardToken, uint256 _amount) external returns (uint256) {
+    function receiveRewards(address _rewardToken, uint256 _amount) external onlyTokenizationManager returns (uint256 utilizedAmount) {
         uint256 _receivedAmount;
         uint256 _receivedAmountVaultNative;
 
@@ -236,6 +242,11 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         IERC20(s_token).transfer(msg.sender, _amount);
     }
 
+    function addNewTokenizedRealEstate(address _tokenizedRealEstate) external onlyTokenizationManager {
+        s_tokenizedRealEstateAddresses.push(_tokenizedRealEstate);
+        emit TokenizedRealEstateAdded(_tokenizedRealEstate);
+    }
+
     function unlockPendingDeposits() external vaultEnabled {
         _unlockPendingDeposits(msg.sender, true);
     }
@@ -301,7 +312,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         ISwapRouter.ExactInputSingleParams memory params = ISwapRouter.ExactInputSingleParams({
             tokenIn: _inToken,
             tokenOut: _outToken,
-            fee: FEE,
+            fee: FEE,        // @todo decide fees on the basis of priority
             recipient: address(this),
             deadline: block.timestamp + SWAP_DEADLINE_DELAY,
             amountIn: _amount,
@@ -325,10 +336,6 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
 
     function getRealEstateRegistry() external view returns (address) {
         return s_registry;
-    }
-
-    function getAllDelegates() external view returns (address[] memory) {
-        return IRealEstateRegistry(s_registry).getDelegates(s_operator);
     }
 
     function getRewards() external view returns (uint256) {

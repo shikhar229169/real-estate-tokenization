@@ -27,7 +27,6 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     error RealEstateRegistry__InvalidToken();
     error RealEstateRegistry__TransferFailed();
     error RealEstateRegistry__OperatorAlreadyExist();
-    error RealEstateRegistry__InvalidDelegates();
     error RealEstateRegistry__ENSNameAlreadyExist();
     error RealEstateRegistry__InvalidENSName();
     error RealEstateRegistry__NativeNotRequired();
@@ -36,7 +35,6 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     // structs
     struct OperatorInfo {
         address vault;
-        address[] delegates;
         string ensName;
         uint256 stakedCollateralInFiat;
         uint256 stakedCollateralInToken;
@@ -51,20 +49,19 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
-    bytes32 private constant REGISTER_VAULT_TYPE_HASH = keccak256("REGISTER_VAULT(address[] delegates, string ensName)");
+    bytes32 private constant REGISTER_VAULT_TYPE_HASH = keccak256("REGISTER_VAULT(string ensName)");
 
     uint256 private constant MIN_OP_FIAT_COLLATERAL = 40_000;
     uint256 private constant MAX_OP_FIAT_COLLATERAL = 1_20_000;
     uint256 private s_fiatCollateralRequiredForOperator;
+    address[] private s_allOperators;
     mapping(address => OperatorInfo) private s_operators;
     mapping(string => address) private s_ensToOperator;
-    uint256 private s_minDelegates;
-    uint256 private s_maxDelegates;
     mapping(address token => address dataFeed) private s_tokenToDataFeeds;
     address[] private s_acceptedTokens;
     address private s_verifyingOpVaultImplementation;
-    mapping(address => bool) private s_usedDelegatesMap;
     address private s_swapRouter;
+    address private s_tokenizationManager;
 
     // events
     event CollateralUpdated(uint256 newCollateral);
@@ -84,10 +81,9 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         uint256 _collateralReqInFiat, 
         address[] memory _acceptedTokens, 
         address[] memory _dataFeeds, 
-        uint256 _minDelegates, 
-        uint256 _maxDelegates, 
         address _verifyingOpVaultImplementation,
-        address _swapRouter
+        address _swapRouter,
+        address _tokenizationManager
     ) EIP712("RealEstateRegistry", "1.0.0") {
         require(_acceptedTokens.length == _dataFeeds.length, RealEstateRegistry__InvalidDataFeeds());
 
@@ -99,10 +95,9 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         _grantRole(SIGNER_ROLE, _signer);
 
         s_fiatCollateralRequiredForOperator = _collateralReqInFiat;
-        s_minDelegates = _minDelegates;
-        s_maxDelegates = _maxDelegates;
         s_verifyingOpVaultImplementation = _verifyingOpVaultImplementation;
         s_swapRouter = _swapRouter;
+        s_tokenizationManager = _tokenizationManager;
         for (uint256 i; i < _acceptedTokens.length; i++) {
             s_acceptedTokens.push(_acceptedTokens[i]);
             s_tokenToDataFeeds[_acceptedTokens[i]] = _dataFeeds[i];
@@ -111,6 +106,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
 
 
     // functions
+    // @todo to remove
     function setCollateralRequiredForOperator(uint256 _newOperatorCollateral) external onlyRole(SETTER_ROLE) {
         require(_newOperatorCollateral >= MIN_OP_FIAT_COLLATERAL && _newOperatorCollateral <= MAX_OP_FIAT_COLLATERAL, RealEstateRegistry__InvalidCollateral());
         s_fiatCollateralRequiredForOperator = _newOperatorCollateral;
@@ -135,20 +131,17 @@ contract RealEstateRegistry is AccessControl, EIP712 {
      * @param _paymentToken The payment token in which collateral will be collected, address(0) for native token
      */
     function depositCollateralAndRegisterVault(
-        address[] memory _delegates, 
         string memory _ensName, 
         address _paymentToken, 
         bytes memory _signature, 
         bool _autoUpdateEnabled
     ) external onlyAcceptedToken(_paymentToken) payable {
         require(!_isOperatorExist(msg.sender), RealEstateRegistry__OperatorAlreadyExist());
-        require(_delegates.length >= s_minDelegates && _delegates.length <= s_maxDelegates, RealEstateRegistry__InvalidDelegates());
         require(s_ensToOperator[_ensName] == address(0), RealEstateRegistry__ENSNameAlreadyExist());
         require(bytes(_ensName).length > 0, RealEstateRegistry__InvalidENSName());
-        _revertIfContainsDup(_delegates);
 
         _verifyHashWithRole(
-            prepareRegisterVaultHash(_delegates, _ensName), 
+            prepareRegisterVaultHash(_ensName), 
             _signature, 
             SIGNER_ROLE
         );
@@ -166,6 +159,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         }
 
         s_ensToOperator[_ensName] = msg.sender;
+        s_allOperators.push(msg.sender);
 
         bytes32 _deploySalt = bytes32(uint256(uint160(msg.sender)));
         bytes memory _deployInitData = abi.encodeWithSelector(IVerifyingOperatorVault.initialize.selector, msg.sender, address(this), _paymentToken, _autoUpdateEnabled);
@@ -175,7 +169,6 @@ contract RealEstateRegistry is AccessControl, EIP712 {
 
         s_operators[msg.sender] = OperatorInfo({
             vault: address(_vaultProxy),
-            delegates: _delegates,
             ensName: _ensName,
             stakedCollateralInFiat: s_fiatCollateralRequiredForOperator,
             stakedCollateralInToken: tokenAmountRequired,
@@ -203,20 +196,20 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         IVerifyingOperatorVault(_operator).upgradeToAndCall(s_verifyingOpVaultImplementation, "");
     }
 
-    // @todo implement
-    function fixCollateral() external payable {
-
-    }
-
+    // @todo 
+    /**
+     * 
+     * @notice slash an operator vault that performs some malicious actions such as approving real estate without proper standards
+     * @notice removes all the collateral from the vault inlcuding the users who have staked and send it to slasher contract 
+     */
     function slashOperatorVault(string memory _ensName) external onlyRole(SLASHER_ROLE) {
         
     }
 
-    function prepareRegisterVaultHash(address[] memory _delegates, string memory _ensName) public view returns (bytes32) {
+    function prepareRegisterVaultHash(string memory _ensName) public view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
                 REGISTER_VAULT_TYPE_HASH, 
-                keccak256(abi.encodePacked(_delegates)), 
                 keccak256(abi.encodePacked(_ensName))
             )
         );
@@ -260,13 +253,6 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         }
     }
 
-    function _revertIfContainsDup(address[] memory _delegates) internal {
-        for (uint256 i; i < _delegates.length; i++) {
-            require(!s_usedDelegatesMap[_delegates[i]], RealEstateRegistry__InvalidDelegates());
-            s_usedDelegatesMap[_delegates[i]] = true;
-        }
-    }
-
     function getOperatorVaultImplementation() external view returns (address) {
         return s_verifyingOpVaultImplementation;
     }
@@ -287,12 +273,12 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         return s_acceptedTokens;
     }
 
-    function getDelegates(address _operator) external view returns (address[] memory) {
-        return s_operators[_operator].delegates;
-    }
-
     function getOperatorVault(address _operator) external view returns (address) {
         return s_operators[_operator].vault;
+    }
+
+    function getAllOperators() external view returns (address[] memory) {
+        return s_allOperators;
     }
 
     function getIsVaultApproved(address _operator) external view returns (bool) {
@@ -307,14 +293,6 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         return s_ensToOperator[_ensName];
     }
 
-    function getMinDelegates() external view returns (uint256) {
-        return s_minDelegates;
-    }
-
-    function getMaxDelegates() external view returns (uint256) {
-        return s_maxDelegates;
-    }
-
     function getSwapRouter() external view returns (address) {
         return s_swapRouter;
     }
@@ -327,4 +305,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         return MAX_OP_FIAT_COLLATERAL;
     }
 
+    function getAssetTokenizationManager() external view returns (address) {
+        return s_tokenizationManager;
+    }
 }

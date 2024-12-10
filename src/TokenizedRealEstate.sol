@@ -12,7 +12,6 @@ contract TokenizedRealEstate is ERC20 {
     error TokenizedRealEstate__OnlyShareHolder();
     
     address private immutable i_assertTonkenizationManager;
-    AggregatorV3Interface private immutable i_ethUsdPriceFeeds;
     uint8 private constant MAX_DECIMALS = 18;
     address private immutable i_assetOwner;
     uint256 private s_amountOfAsset;
@@ -51,9 +50,14 @@ contract TokenizedRealEstate is ERC20 {
         _;
     }
 
-    constructor(address assertTonkenizationManager, address ethUsdPriceFeeds, address assetOwner,uint256 percentageForShareholders, uint256 amountOfAsset, uint256 tokenId) ERC20("Tokenized Real Estate", "TRE") {
+    constructor(
+        address assertTonkenizationManager, 
+        address assetOwner,
+        uint256 percentageForShareholders, 
+        uint256 amountOfAsset, 
+        uint256 tokenId
+    ) ERC20("Tokenized Real Estate", "TRE") {
         i_assertTonkenizationManager = assertTonkenizationManager;
-        i_ethUsdPriceFeeds = AggregatorV3Interface(ethUsdPriceFeeds);
         i_assetOwner = assetOwner;
         s_percentageForShareholders = percentageForShareholders;
         s_amountOfAsset = amountOfAsset;
@@ -146,10 +150,6 @@ contract TokenizedRealEstate is ERC20 {
 
     function burnTokenizedRealEstate(uint256 amount) external onlyAssetTokenizationManager {
         _burn(msg.sender, amount);
-    }
-
-    function getEthUsdcPriceFeeds() external view returns (address) {
-        return address(i_ethUsdPriceFeeds);
     }
 
     function getAssetTokenizationManager() external view returns (address) {

@@ -10,8 +10,7 @@ import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-
-contract CrossChainManager is CCIPReceiver, OwnerIsCreator, AccessControl {
+abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessControl {
     using SafeERC20 for IERC20;
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees); 
@@ -53,6 +52,8 @@ contract CrossChainManager is CCIPReceiver, OwnerIsCreator, AccessControl {
 
     mapping(address => bool) public allowlistedSenders;
 
+    mapping(uint256 => uint64) public chainIdToSelector;
+
     mapping(string => CCManager) public chainToCCManager;
 
     IERC20 private s_linkToken;
@@ -60,8 +61,13 @@ contract CrossChainManager is CCIPReceiver, OwnerIsCreator, AccessControl {
     /// @notice Constructor initializes the contract with the router address.
     /// @param _router The address of the router contract.
     /// @param _link The address of the link contract.
-    constructor(address _router, address _link) CCIPReceiver(_router) {
+    constructor(address _router, address _link, uint256[] memory _chainId, uint64[] memory _chainSelector) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
+
+        for (uint256 i = 0; i < _chainId.length; i++) {
+            chainIdToSelector[_chainId[i]] = _chainSelector[i];
+        }
+
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
@@ -191,6 +197,8 @@ contract CrossChainManager is CCIPReceiver, OwnerIsCreator, AccessControl {
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedData = any2EvmMessage.data; // fetch the data
 
+        _handleCrossChainMessage(s_lastReceivedMessageId, s_lastReceivedData);
+
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector, // fetch the source chain identifier (aka selector)
@@ -198,6 +206,8 @@ contract CrossChainManager is CCIPReceiver, OwnerIsCreator, AccessControl {
             any2EvmMessage.data
         );
     }
+
+    function _handleCrossChainMessage(bytes32 _messageId, bytes memory _data) internal virtual;
 
     /// @notice Construct a CCIP message.
     /// @dev This function will create an EVM2AnyMessage struct with all the necessary information for sending a text.
