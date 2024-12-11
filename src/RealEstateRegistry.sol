@@ -59,6 +59,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     mapping(string => address) private s_ensToOperator;
     mapping(address token => address dataFeed) private s_tokenToDataFeeds;
     address[] private s_acceptedTokens;
+    mapping(address tokenX => mapping(uint256 chainId => address tokenY)) private s_tokenOnAnotherChain;
     address private s_verifyingOpVaultImplementation;
     address private s_swapRouter;
     address private s_tokenizationManager;
@@ -101,6 +102,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         for (uint256 i; i < _acceptedTokens.length; i++) {
             s_acceptedTokens.push(_acceptedTokens[i]);
             s_tokenToDataFeeds[_acceptedTokens[i]] = _dataFeeds[i];
+            s_tokenOnAnotherChain[_acceptedTokens[i]][block.chainid] = _acceptedTokens[i];
         }
     }
 
@@ -111,6 +113,11 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         require(_newOperatorCollateral >= MIN_OP_FIAT_COLLATERAL && _newOperatorCollateral <= MAX_OP_FIAT_COLLATERAL, RealEstateRegistry__InvalidCollateral());
         s_fiatCollateralRequiredForOperator = _newOperatorCollateral;
         emit CollateralUpdated(_newOperatorCollateral);
+    }
+
+    function setTokenForAnotherChain(address _tokenOnBaseChain, uint256 _chainId, address _tokenOnAnotherChain) external onlyRole(SETTER_ROLE) {
+        require(s_tokenToDataFeeds[_tokenOnBaseChain] != address(0), RealEstateRegistry__InvalidToken());
+        s_tokenOnAnotherChain[_tokenOnBaseChain][_chainId] = _tokenOnAnotherChain;
     }
 
     function addCollateralToken(address _newToken, address _dataFeed) external onlyRole(SETTER_ROLE) {
@@ -271,6 +278,10 @@ contract RealEstateRegistry is AccessControl, EIP712 {
 
     function getAcceptedTokens() external view returns (address[] memory) {
         return s_acceptedTokens;
+    }
+
+    function getAcceptedTokenOnChain(address _baseAcceptedToken, uint256 _chainId) external view returns (address) {
+        return s_tokenOnAnotherChain[_baseAcceptedToken][_chainId];
     }
 
     function getOperatorVault(address _operator) external view returns (address) {

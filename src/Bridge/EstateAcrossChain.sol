@@ -21,11 +21,6 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     error SenderNotAllowlisted(address sender); 
     error InvalidReceiverAddress(); 
 
-    struct CCManager {
-        address ccManager;
-        uint64 chainSelector;
-    }
-
     event MessageSent(
         bytes32 indexed messageId, 
         uint64 indexed destinationChainSelector, 
@@ -42,19 +37,11 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         bytes data 
     );
 
-    bytes32 private constant BRIDGER_ROLE = keccak256("BRIDGER_ROLE");
     bytes32 private s_lastReceivedMessageId; 
     bytes private s_lastReceivedData;
 
-    mapping(uint64 => bool) public allowlistedDestinationChains;
-
-    mapping(uint64 => bool) public allowlistedSourceChains;
-
-    mapping(address => bool) public allowlistedSenders;
-
     mapping(uint256 => uint64) public chainIdToSelector;
-
-    mapping(string => CCManager) public chainToCCManager;
+    mapping(uint64 => address) public chainSelectorToManager;
 
     IERC20 private s_linkToken;
 
@@ -71,21 +58,13 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    /// @dev Modifier that checks if the chain with the given destinationChainSelector is allowlisted.
-    /// @param _destinationChainSelector The selector of the destination chain.
-    modifier onlyAllowlistedDestinationChain(uint64 _destinationChainSelector) {
-        if (!allowlistedDestinationChains[_destinationChainSelector])
-            revert DestinationChainNotAllowlisted(_destinationChainSelector);
-        _;
-    }
-
     /// @dev Modifier that checks if the chain with the given sourceChainSelector is allowlisted and if the sender is allowlisted.
-    /// @param _sourceChainSelector The selector of the destination chain.
+    /// @param _sourceChainSelector The selector of the source chain.
     /// @param _sender The address of the sender.
     modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
-        if (!allowlistedSourceChains[_sourceChainSelector])
-            revert SourceChainNotAllowlisted(_sourceChainSelector);
-        if (!allowlistedSenders[_sender]) revert SenderNotAllowlisted(_sender);
+        if (chainSelectorToManager[_sourceChainSelector] != _sender) {
+            revert SenderNotAllowlisted(_sender);
+        }
         _;
     }
 
@@ -96,54 +75,30 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         _;
     }
 
-    /// @dev Updates the allowlist status of a destination chain for transactions.
-    function allowlistDestinationChain(
-        uint64 _destinationChainSelector,
-        bool allowed
-    ) external onlyOwner {
-        allowlistedDestinationChains[_destinationChainSelector] = allowed;
-    }
-
-    /// @dev Updates the allowlist status of a source chain for transactions.
-    function allowlistSourceChain(
-        uint64 _sourceChainSelector,
-        bool allowed
-    ) external onlyOwner {
-        allowlistedSourceChains[_sourceChainSelector] = allowed;
-    }
-
     /// @dev Updates the allowlist status of a sender for transactions.
-    function allowlistSender(address _sender, bool allowed) external onlyOwner {
-        allowlistedSenders[_sender] = allowed;
+    /// @notice used to allowlist the AssetTokenizationManager on various chains
+    function allowlistManager(uint64 _chainSelector, address _manager) external onlyOwner {
+        chainSelectorToManager[_chainSelector] = _manager;
     }
 
-    function addCCManagerForChain(string memory chain, address ccmanager, uint64 chainSelector) external onlyOwner {
-        chainToCCManager[chain] = CCManager({
-            ccManager: ccmanager,
-            chainSelector: chainSelector
-        });
-    }
-
-    function bridgeRequest(address _sender, string memory _chain, bytes calldata _data) external onlyRole(BRIDGER_ROLE) returns (bytes32) {
-        return _sendMessagePayLINK(_sender, chainToCCManager[_chain].chainSelector, chainToCCManager[_chain].ccManager, _data);
+    function bridgeRequest(uint256 _chainId, bytes memory _data, uint256 _gasLimit) internal returns (bytes32) {
+        return _sendMessagePayLINK(chainIdToSelector[_chainId], chainSelectorToManager[chainIdToSelector[_chainId]], _data, _gasLimit);
     }
 
     /// @notice Sends data to receiver on the destination chain.
     /// @notice Pay for fees in LINK.
     /// @dev Assumes your contract has sufficient LINK.
-    /// @param _sender The user who initiated the bridge request on real estate 
     /// @param _destinationChainSelector The identifier (aka selector) for the destination blockchain.
     /// @param _receiver The address of receiving contract
     /// @param _data The data to be sent.
     /// @return messageId The ID of the CCIP message that was sent.
     function _sendMessagePayLINK(
-        address _sender,
         uint64 _destinationChainSelector,
         address _receiver,
-        bytes calldata _data
+        bytes memory _data,
+        uint256 _gasLimit
     )
         internal
-        onlyAllowlistedDestinationChain(_destinationChainSelector)
         validateReceiver(_receiver)
         returns (bytes32 messageId)
     {
@@ -151,7 +106,8 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         Client.EVM2AnyMessage memory evm2AnyMessage = _buildCCIPMessage(
             _receiver,
             _data,
-            address(s_linkToken)
+            address(s_linkToken),
+            _gasLimit
         );
 
         // Initialize a router client instance to interact with cross-chain router
@@ -160,7 +116,7 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         // Get the fee required to send the CCIP message
         uint256 fees = router.getFee(_destinationChainSelector, evm2AnyMessage);
 
-        s_linkToken.safeTransferFrom(_sender, address(this), fees);
+        // s_linkToken.safeTransferFrom(msg.sender, address(this), fees);
 
         // approve the Router to transfer LINK tokens on contract's behalf. It will spend the fees in LINK
         s_linkToken.approve(address(router), fees);
@@ -217,8 +173,9 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     /// @return Client.EVM2AnyMessage Returns an EVM2AnyMessage struct which contains information for sending a CCIP message.
     function _buildCCIPMessage(
         address _receiver,
-        bytes calldata _data,
-        address _feeTokenAddress
+        bytes memory _data,
+        address _feeTokenAddress,
+        uint256 _gasLimit
     ) private pure returns (Client.EVM2AnyMessage memory) {
         return Client.EVM2AnyMessage({
             receiver: abi.encode(_receiver), 
@@ -226,7 +183,7 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
             tokenAmounts: new Client.EVMTokenAmount[](0), // no tokens being transferred, only data
             extraArgs: Client._argsToBytes(
                 Client.EVMExtraArgsV2({
-                    gasLimit: 200_000, 
+                    gasLimit: _gasLimit, 
                     allowOutOfOrderExecution: true // Allows the message to be executed out of order relative to other messages from the same sender
                 })
             ),

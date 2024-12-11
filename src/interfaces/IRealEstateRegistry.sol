@@ -67,6 +67,7 @@ interface IRealEstateRegistry {
         );
     function emergencyWithdrawToken(address _token) external;
     function forceUpdateOperatorVault(string memory _operatorVaultEns) external;
+    function getAcceptedTokenOnChain(address _baseAcceptedToken, uint256 _chainId) external view returns (address);
     function getAcceptedTokens() external view returns (address[] memory);
     function getAllOperators() external view returns (address[] memory);
     function getAssetTokenizationManager() external view returns (address);
@@ -89,6 +90,8 @@ interface IRealEstateRegistry {
     function revokeRole(bytes32 role, address account) external;
     function setCollateralRequiredForOperator(uint256 _newOperatorCollateral) external;
     function setSwapRouter(address _swapRouter) external;
+    function setTokenForAnotherChain(address _tokenOnBaseChain, uint256 _chainId, address _tokenOnAnotherChain)
+        external;
     function slashOperatorVault(string memory _ensName) external;
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
     function updateVOVImplementation(address _newVerifyingOpVaultImplementation) external;

@@ -34,12 +34,14 @@ interface IVerifyingOperatorVault {
     event SlippageUpdated(uint256 newSlippage);
     event StakeDelayUpdated(uint256 newStakedDelay);
     event StakeWithdrawn(uint256 amount);
+    event TokenizedRealEstateAdded(address tokenizedRealEstate);
     event Upgraded(address indexed implementation);
     event WithdrawPending(uint256 amount, uint256 deadline);
 
     function DEFAULT_ADMIN_ROLE() external view returns (bytes32);
     function UPGRADER_ROLE() external view returns (bytes32);
     function UPGRADE_INTERFACE_VERSION() external view returns (string memory);
+    function addNewTokenizedRealEstate(address _tokenizedRealEstate) external;
     function claimRewardFromStaking() external;
     function getPriceFromTokenToAnotherToken(address _tokenA, address _tokenB, uint256 _tokenAmountA)
         external
