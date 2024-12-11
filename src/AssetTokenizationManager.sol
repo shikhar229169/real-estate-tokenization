@@ -270,9 +270,30 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return _deploymentAddrForOtherChains;
     }
 
+    function _baseURI() internal pure override returns (string memory) {
+        return "data:application/json;base64,";
+    }
 
     function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        return "";
+        EstateInfo memory estateInfo = s_tokenidToEstateInfo[_tokenId];
+        
+        string memory estateTokenUri = Base64.encode(
+            abi.encodePacked(
+                '{"name": "Tokenized Estate #', Strings.toString(_tokenId),
+                '", "description": "This NFT represents a tokenized real estate asset",',
+                '"attributes": {',
+                    '"estateOwner": "', Strings.toHexString(estateInfo.estateOwner),
+                    '", "percentageToTokenize": "', Strings.toString(estateInfo.percentageToTokenize),
+                    '", "tokenizedRealEstate": "', Strings.toHexString(estateInfo.tokenizedRealEstate),
+                    '", "estateCost": "', Strings.toString(estateInfo.estateCost),
+                    '", "accumulatedRewards": "', Strings.toString(estateInfo.accumulatedRewards),
+                    '", "verifyingOperator": "', Strings.toHexString(estateInfo.verifyingOperator),
+                '"}'
+                '}'
+            )
+        );
+
+        return string.concat(_baseURI(), estateTokenUri);
     }
 
     function getEstateInfo(uint256 tokenId) external view returns (EstateInfo memory) {
