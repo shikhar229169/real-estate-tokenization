@@ -49,7 +49,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     bytes32 public constant APPROVER_ROLE = keccak256("APPROVER_ROLE");
     bytes32 public constant SIGNER_ROLE = keccak256("SIGNER_ROLE");
 
-    bytes32 private constant REGISTER_VAULT_TYPE_HASH = keccak256("REGISTER_VAULT(string ensName)");
+    bytes32 private constant REGISTER_VAULT_TYPE_HASH = keccak256("REGISTER_VAULT(address operator,string ensName)");
 
     uint256 private constant MIN_OP_FIAT_COLLATERAL = 40_000;
     uint256 private constant MAX_OP_FIAT_COLLATERAL = 1_20_000;
@@ -148,7 +148,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         require(bytes(_ensName).length > 0, RealEstateRegistry__InvalidENSName());
 
         _verifyHashWithRole(
-            prepareRegisterVaultHash(_ensName), 
+            prepareRegisterVaultHash(msg.sender, _ensName), 
             _signature, 
             SIGNER_ROLE
         );
@@ -213,10 +213,11 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         
     }
 
-    function prepareRegisterVaultHash(string memory _ensName) public view returns (bytes32) {
+    function prepareRegisterVaultHash(address _operator, string memory _ensName) public view returns (bytes32) {
         bytes32 structHash = keccak256(
             abi.encode(
-                REGISTER_VAULT_TYPE_HASH, 
+                REGISTER_VAULT_TYPE_HASH,
+                _operator,
                 keccak256(abi.encodePacked(_ensName))
             )
         );
