@@ -263,7 +263,17 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         for (uint256 i; i < _chainsToDeploy.length; i++) {
             address _paymentTokenOnChain = IRealEstateRegistry(s_registry).getAcceptedTokenOnChain(_paymentToken, _chainsToDeploy[i]);
             address _manager = chainSelectorToManager[chainIdToSelector[_chainsToDeploy[i]]];
-            bytes memory code = abi.encodePacked(type(TokenizedRealEstate).creationCode, abi.encode(_estateOwner[i], _estateCost, _percentageToTokenize, _tokenId, _paymentTokenOnChain));
+            bytes memory _creationCode = type(TokenizedRealEstate).creationCode;
+            bytes memory code = abi.encodePacked(
+                _creationCode, 
+                abi.encode(
+                    _estateOwner[i], 
+                    _estateCost,
+                    _percentageToTokenize, 
+                    _tokenId, 
+                    _paymentTokenOnChain
+                )
+            );
             bytes32 hash = keccak256(abi.encodePacked(bytes1(0xff), _manager, _salt, keccak256(code)));
             _deploymentAddrForOtherChains[i] = address(uint160(uint256(hash)));
         }
