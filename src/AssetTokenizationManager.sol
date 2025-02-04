@@ -314,6 +314,14 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return ERC721.supportsInterface(interfaceId) || EstateAcrossChain.supportsInterface(interfaceId);
     }
 
+    function getBaseChain() external view returns (uint256) {
+        return i_baseChain;
+    }
+
+    function getSupportedChains() external view returns (uint256[] memory) {
+        return s_supportedChains;
+    }
+
     // function _calculateNetAmountForShares(uint256 percentageForShareholders, uint256 amountOfAsset)
     //     internal
     //     pure
