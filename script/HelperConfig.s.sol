@@ -31,32 +31,32 @@ contract HelperConfig is Script {
 
     function run() external {
         if (block.chainid == homeChainId) {
-            networkConfig = getTestConfig();
+            networkConfig = getArbitrumConfig();
         }
         else if (block.chainid == polygonChainId) {
-            networkConfig = getTestConfig();
+            networkConfig = getPolygonConfig();
         }
         else if (block.chainid == avalancheChainId) {
-            networkConfig = getTestConfig();
+            networkConfig = getAvalancheConfig();
         }
         else {
             networkConfig = getTestConfig();
         }
     }
 
-    function getArbitrumConfig() external pure returns (NetworkConfig memory _networkConfig) {
+    function getArbitrumConfig() public pure returns (NetworkConfig memory _networkConfig) {
         return _networkConfig;
     }
 
-    function getPolygonConfig() external pure returns (NetworkConfig memory _networkConfig) {
+    function getPolygonConfig() public pure returns (NetworkConfig memory _networkConfig) {
         return _networkConfig;
     }
 
-    function getAvalancheConfig() external pure returns (NetworkConfig memory _networkConfig) {
+    function getAvalancheConfig() public pure returns (NetworkConfig memory _networkConfig) {
         return _networkConfig;
     }
 
-    function getTestConfig() internal pure returns (NetworkConfig memory _networkConfig) {
+    function getTestConfig() public pure returns (NetworkConfig memory _networkConfig) {
         _networkConfig.swapRouter = 0x20C8c9F13C6AA402F2545AD15fB7a9CdE9108618;//(Destination network) -> (Avalanche Fuji) OnRamp address
         _networkConfig.ccipRouter = 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165; 
         _networkConfig.functionsRouter = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;

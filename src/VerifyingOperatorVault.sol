@@ -11,6 +11,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { ISwapRouter } from "./interfaces/ISwapRouter.sol";
+import { console } from "forge-std/Test.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
@@ -133,9 +134,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     function toggleAutoUpdate() external vaultEnabled onlyRole(DEFAULT_ADMIN_ROLE) {
         if (s_isAutoUpdateEnabled) {
             address _currentImp = IRealEstateRegistry(s_registry).getOperatorVaultImplementation();
-            if (_currentImp != i_thisContract) {
-                StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value = _currentImp;
-            }
+            StorageSlot.getAddressSlot(IMPLEMENTATION_SLOT).value = _currentImp;
         }
 
         s_isAutoUpdateEnabled = !s_isAutoUpdateEnabled;

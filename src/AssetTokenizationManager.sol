@@ -60,6 +60,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     uint256 private immutable i_baseChain;
     mapping(bytes32 reqId => TokenizeFunctionCallRequest) private s_reqIdToTokenizeFunctionCallRequest;
     mapping(uint256 => mapping(uint256 => address)) private s_tokenIdToChainIdToTokenizedRealEstate;
+    bytes private s_latestError;
 
     EstateVerificationFunctionsParams private s_estateVerificationFunctionsParams;
 
@@ -164,6 +165,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
 
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         _fulfillCreateEstateRequest(requestId, response);
+        s_latestError = err;
     }
 
     function _fulfillCreateEstateRequest(bytes32 _reqId, bytes memory _response) internal {
@@ -320,6 +322,10 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
 
     function getSupportedChains() external view returns (uint256[] memory) {
         return s_supportedChains;
+    }
+
+    function getLatestError() external view returns (bytes memory) {
+        return s_latestError;
     }
 
     // function _calculateNetAmountForShares(uint256 percentageForShareholders, uint256 amountOfAsset)
