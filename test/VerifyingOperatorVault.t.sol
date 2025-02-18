@@ -126,6 +126,21 @@ contract AssetTokenizationManagerTest is Test {
 
         assert(VerifyingOperatorVault(vault).isAutoUpdateEnabled() == false);
         assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation);
+
+        // again new implementation
+        address newVovImplementation2 = address(new VerifyingOperatorVault());
+        vm.prank(admin);
+        realEstateRegistry.updateVOVImplementation(newVovImplementation2);
+
+        assert(newVovImplementation != newVovImplementation2);
+
+        // the current implementation of vault should be the newVovImplementation
+        assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation);
+
+        // node operator turns on auto update
+        vm.prank(nodeOperator);
+        VerifyingOperatorVault(vault).toggleAutoUpdate();
+        assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation2);
     }
 
     function prepareAndSignSignature(address _nodeOperaror, string memory _ensName) internal view returns (bytes memory _signature) {
