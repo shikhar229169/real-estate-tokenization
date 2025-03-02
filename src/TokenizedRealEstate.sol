@@ -19,18 +19,11 @@ contract TokenizedRealEstate is ERC20 {
     uint256 private immutable i_tokenId;
     uint256 private immutable i_percentageToTokenize;
     address private immutable i_paymentToken;
-    mapping(uint256 => EstateInfo) private s_tokenidToAssetInfo;
     mapping(address => shareHolderInfo) private s_shareHolderToShareHolderInfo;
     mapping(address => bool) private isShareHolder;
 
     uint8 private constant MAX_DECIMALS = 18;
     uint256 private constant TOTAL_TRE = 1e6 * 1e18;
-
-    struct EstateInfo {
-        uint256 sharesAvailable;
-        uint256 currRentAmount;
-        uint256 netAmountForShareholders;
-    }
 
     struct shareHolderInfo {
         uint256 tokenId;
