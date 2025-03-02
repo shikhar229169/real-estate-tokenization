@@ -67,4 +67,5 @@ interface IVerifyingOperatorVault {
     function upgradeToAndCall(address newImplementation, bytes memory data) external payable;
     function withdrawFromPending() external;
     function withdrawStake(uint256 _amount) external;
+    function slashVault() external;
 }

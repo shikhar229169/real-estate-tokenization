@@ -12,6 +12,11 @@ import { IVerifyingOperatorVault } from "./interfaces/IVerifyingOperatorVault.so
 import { FunctionsClient, FunctionsRequest } from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import { Base64 } from "@openzeppelin/contracts/utils/Base64.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+
+interface IERC20Decimals {
+    function decimals() external view returns (uint8);
+}
 
 contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient {
     // libraries
@@ -54,6 +59,8 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     // variables
     address private s_registry;
     mapping(uint256 tokenId => EstateInfo) private s_tokenidToEstateInfo;
+    mapping(address estateOwner => address tokenizedRealEstate) private s_estateOwnerToTokenizedRealEstate;
+    mapping(address estateOwner => uint256 collateralAmount) private s_getCollateralDepositedBy;
     uint256 private s_tokenCounter;
     uint256[] private s_supportedChains;
     mapping(uint256 chainId => bool) private s_isSupportedChain;
@@ -61,6 +68,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     mapping(bytes32 reqId => TokenizeFunctionCallRequest) private s_reqIdToTokenizeFunctionCallRequest;
     mapping(uint256 => mapping(uint256 => address)) private s_tokenIdToChainIdToTokenizedRealEstate;
     bytes private s_latestError;
+    uint256 public constant ESTATE_OWNER_COLLATERAL_USD = 200;
 
     EstateVerificationFunctionsParams private s_estateVerificationFunctionsParams;
 
@@ -83,6 +91,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     }
 
     // constructor
+    /// @param _baseChainId here this chainId is of the avalanche chain
     constructor(
         address _ccipRouter, 
         address _link, 
@@ -162,7 +171,6 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return reqId;
     }
 
-
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         _fulfillCreateEstateRequest(requestId, response);
         s_latestError = err;
@@ -204,6 +212,12 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
             verifyingOperator: _verifyingOperator
         });
 
+        s_estateOwnerToTokenizedRealEstate[_request.estateOwner] = tokenizedRealEstate;
+
+        // take collateral from estate owner
+        // collateral deposited only on base (avalanche) chain
+        _processCollateralFromEstateOwner(_request.estateOwner, _paymentToken);
+
         // @audit should be use tokenId from counter or instead use tokenid from salt
         address[] memory _deploymentAddrForOtherChains = _getAllChainDeploymentAddr(_request.estateOwnerAcrossChain, estateCost, percentageToTokenize, _tokenId, _salt, _paymentToken, _request.chainsToDeploy);
 
@@ -214,6 +228,31 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainId] = _deploymentAddrForOtherChains[i];
             bridgeRequest(_chainId, bridgeData, 500_000);
         }
+    }
+
+    function _processCollateralFromEstateOwner(address _estateOwner, address _paymentToken) internal {
+        address _priceFeed = IRealEstateRegistry(s_registry).getDataFeedForToken(_paymentToken);
+        uint256 paymentTokenDecimals;
+
+        if (_paymentToken == address(0)) {
+            paymentTokenDecimals = 18;
+        }
+        else {    
+            paymentTokenDecimals = IERC20Decimals(_paymentToken).decimals();
+        }
+
+        uint256 decimals = AggregatorV3Interface(_priceFeed).decimals();
+        (, int256 answer, , ,) = AggregatorV3Interface(_priceFeed).latestRoundData();
+        uint256 collateralAmount = ESTATE_OWNER_COLLATERAL_USD * (10 ** (paymentTokenDecimals + decimals)) / uint256(answer);
+
+        s_getCollateralDepositedBy[_estateOwner] = collateralAmount;
+        IERC20(_paymentToken).safeTransferFrom(_estateOwner, address(this), collateralAmount);
+    }
+
+    /// @dev callable only from estate owner tokenized real estate contract (inlude some delay for consideration)
+    /// @notice handles for estate owner not providing regular collateral updates per month basis
+    function slashEstateOwnerCollateral() external {
+        
     }
 
     function _handleCrossChainMessage(bytes32 /*_messageId*/, bytes memory _data) internal override {
@@ -254,6 +293,8 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
             accumulatedRewards: 0,
             verifyingOperator: address(0)
         });
+
+        s_estateOwnerToTokenizedRealEstate[_estateOwner] = tokenizedRealEstate;
 
         for (uint256 i = 0; i < _chainsToDeploy.length; i++) {
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainsToDeploy[i]] = _deploymentAddrForOtherChains[i];

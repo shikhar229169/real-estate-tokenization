@@ -68,6 +68,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     event CollateralUpdated(uint256 newCollateral);
     event OperatorVaultRegistered(address operator, address vault);
     event OperatorVaultApproved(address approver, address operator);
+    event OperatorVaultSlashed(string ensName, address operator);
 
     // modifiers
     modifier onlyAcceptedToken(address _token) {
@@ -115,6 +116,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         emit CollateralUpdated(_newOperatorCollateral);
     }
 
+    // token on current chain to chain id to ...
     function setTokenForAnotherChain(address _tokenOnBaseChain, uint256 _chainId, address _tokenOnAnotherChain) external onlyRole(SETTER_ROLE) {
         require(s_tokenToDataFeeds[_tokenOnBaseChain] != address(0), RealEstateRegistry__InvalidToken());
         s_tokenOnAnotherChain[_tokenOnBaseChain][_chainId] = _tokenOnAnotherChain;
@@ -210,7 +212,15 @@ contract RealEstateRegistry is AccessControl, EIP712 {
      * @notice removes all the collateral from the vault inlcuding the users who have staked and send it to slasher contract 
      */
     function slashOperatorVault(string memory _ensName) external onlyRole(SLASHER_ROLE) {
+        address _operator = s_ensToOperator[_ensName];
+        require(s_operators[_operator].isApproved, RealEstateRegistry__InvalidENSName());
+        s_operators[_operator].isApproved = false;
+        uint256 tokenAmount = s_operators[_operator].stakedCollateralInToken;
+        address token = s_operators[_operator].token;
         
+        emit OperatorVaultSlashed(_ensName, _operator);
+        IERC20(token).safeTransfer(msg.sender, tokenAmount);
+        IVerifyingOperatorVault(s_operators[_operator].vault).slashVault();
     }
 
     function prepareRegisterVaultHash(address _operator, string memory _ensName) public view returns (bytes32) {

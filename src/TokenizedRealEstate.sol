@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { AssetTokenizationManager } from "./AssetTokenizationManager.sol";
+import { IRealEstateRegistry } from "./interfaces/IRealEstateRegistry.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract TokenizedRealEstate is ERC20 {
@@ -67,6 +68,40 @@ contract TokenizedRealEstate is ERC20 {
         i_tokenId = tokenId;
         i_paymentToken = paymentTokenOnChain;
     }
+
+    /**
+     * 
+     * @param percentageEstateToBuy The corresponding ownership in percentage user wants to buy
+     */
+    function buyAssests(uint256 percentageEstateToBuy) external {
+        // uint256 currAvailableAsset = 
+    }
+
+    function getEstateOwner() external view returns (address) {
+        return i_estateOwner;
+    }
+
+    function getEstateCost() external view returns (uint256) {
+        return s_estateCost;
+    }
+
+    function getPercentageToTokenize() external view returns (uint256) {
+        return i_percentageToTokenize;
+    }
+
+    function getTokenId() external view returns (uint256) {
+        return i_tokenId;
+    }
+
+    function getPaymentToken() external view returns (address) {
+        return i_paymentToken;
+    }
+
+    function getAssetTokenizationManager() external view returns (address) {
+        return i_assetTokenizationManager;
+    }
+
+    
 
     // function buySharesOfAsset(uint256 amount) external payable {
     //     // if (msg.value != amount) {

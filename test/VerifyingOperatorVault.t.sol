@@ -140,6 +140,7 @@ contract AssetTokenizationManagerTest is Test {
         // node operator turns on auto update
         vm.prank(nodeOperator);
         VerifyingOperatorVault(vault).toggleAutoUpdate();
+        assert(VerifyingOperatorVault(vault).isAutoUpdateEnabled() == true);
         assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation2);
     }
 

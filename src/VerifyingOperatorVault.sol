@@ -52,6 +52,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     bool private s_isAutoUpdateEnabled;
     address private immutable i_thisContract;
     address[] private s_tokenizedRealEstateAddresses;
+    bool private s_isSlashed;
 
     mapping(address user => UserDepositInfo) private s_userDepositInfo;
     mapping(address user => uint256 claim) private s_userClaimableReward;
@@ -130,6 +131,11 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         require(_currentImp == newImplementation && newImplementation != i_thisContract, VerifyingOperatorVault__InvalidImplementation());
         require(!s_isAutoUpdateEnabled, VerifyingOperatorVault__AutoUpdateEnabled());
     }
+
+    function slashVault() external {
+        require(msg.sender == s_registry, VerifyingOperatorVault__NotAuthorized());
+        s_isSlashed = true;
+    } 
 
     function toggleAutoUpdate() external vaultEnabled onlyRole(DEFAULT_ADMIN_ROLE) {
         if (s_isAutoUpdateEnabled) {
@@ -341,5 +347,9 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
         UserDepositInfo memory _info = s_userDepositInfo[msg.sender];
         uint256 accumualated = (rewardPerTokenStored - _info.rewardClaimedPerToken) * _info.amountDeposited;
         return s_userClaimableReward[msg.sender] + accumualated;
+    }
+
+    function getIsSlashed() external view returns (bool) {
+        return s_isSlashed;
     }
 }
