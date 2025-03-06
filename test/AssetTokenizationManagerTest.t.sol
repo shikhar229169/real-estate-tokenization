@@ -332,4 +332,28 @@ contract AssetTokenizationManagerTest is Test {
     //     realEstateRegistry.depositCollateralAndRegisterVault(operatorVaultEns, networkConfig.link, data, false);
     //     vm.stopPrank();
     // }
+
+    function test_fulfillCreateEstateRequest() public {
+        AssetTokenizationManager.TokenizeFunctionCallRequest memory request;
+        request.estateOwner = user;
+        request.chainsToDeploy = new uint256[](2);
+        request.chainsToDeploy[0] = networkConfig.supportedChains[0];
+        request.chainsToDeploy[1] = networkConfig.supportedChains[1];
+        request.paymentToken = networkConfig.link;
+        request.estateOwnerAcrossChain = new address[](2);
+        request.estateOwnerAcrossChain[0] = user;
+        request.estateOwnerAcrossChain[1] = makeAddr("owner");
+
+        uint256 estateCost = 1e18;
+        uint256 percentageToTokenize = 50;
+        bool isApproved = true;
+        bytes memory _saltBytes = abi.encode(5802);
+        address _verifyingOperator = makeAddr("verifyingOperator");
+
+        bytes memory response = abi.encode(estateCost, percentageToTokenize, isApproved, _saltBytes, _verifyingOperator);
+        
+        vm.startPrank(owner);
+        assetTokenizationManager.createTestRequestIdResponse(request, response);
+        vm.stopPrank();
+    }
 }
