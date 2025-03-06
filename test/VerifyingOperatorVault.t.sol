@@ -20,6 +20,7 @@ contract AssetTokenizationManagerTest is Test {
     error AssetTokenizationManager__NotAssetOwner();
     error RealEstateRegistry__InvalidToken();
     error RealEstateRegistry__InvalidCollateral();
+    error VerifyingOperatorVault__IncorrectSlippage();
 
     // TokenizedRealEstate public tokenizedRealEstate;
     // address owner;
@@ -148,5 +149,138 @@ contract AssetTokenizationManagerTest is Test {
         bytes32 digest = realEstateRegistry.prepareRegisterVaultHash(_nodeOperaror, _ensName);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
         _signature = abi.encodePacked(r, s, v);
+    }
+
+    function test_setMaxSlippageMoreThanSlippage() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+        
+        uint256 moreThanSlippage = 100e18+1;
+        vm.startPrank(nodeOperator);
+        vm.expectRevert(VerifyingOperatorVault__IncorrectSlippage.selector);
+        VerifyingOperatorVault(vault).setMaxSlippage(moreThanSlippage);
+        vm.stopPrank();
+    }
+
+    // function test_setMaxSlippageLessOrEqualThanSlippage() public {
+    //     bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+    //     vm.startPrank(nodeOperator);
+
+    //     mockToken.approve(address(realEstateRegistry), 1e18);
+    //     realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+    //     vm.stopPrank();
+
+    //     vm.prank(admin);
+    //     realEstateRegistry.approveOperatorVault("meow");
+
+    //     address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+        
+    //     uint256 lessThanSlippage = 100;
+    //     vm.startPrank(nodeOperator);
+    //     VerifyingOperatorVault(vault).setMaxSlippage(lessThanSlippage);
+    //     vm.stopPrank();
+    //     assertEq(VerifyingOperatorVault(vault).s_maxSlippage(), lessThanSlippage);
+    // }
+
+    function test_stakeCollateral() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+
+        vm.startPrank(nodeOperator);
+        vm.expectRevert("Amount must be greater than 0");
+        VerifyingOperatorVault(vault).stakeCollateral(0);
+        vm.stopPrank();
+    }
+
+    function test_slashVault() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+
+        vm.startPrank(nodeOperator);
+        vm.expectRevert();
+        VerifyingOperatorVault(vault).slashVault();
+        vm.stopPrank();
+    }
+
+    function test_getRealEstateRegistry() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+
+        assertEq(VerifyingOperatorVault(vault).getRealEstateRegistry(), address(realEstateRegistry));
+    }
+
+    function test_getIsSlashed() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+
+        assertEq(VerifyingOperatorVault(vault).getIsSlashed(), false);
+    }
+
+    function test_isAutoUpdateEnabled() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+
+        assertEq(VerifyingOperatorVault(vault).isAutoUpdateEnabled(), true);
     }
 }

@@ -176,6 +176,12 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         s_latestError = err;
     }
 
+    function createTestRequestIdResponse(TokenizeFunctionCallRequest memory _request, bytes memory _response) external {
+        bytes32 _requestId = keccak256(abi.encode(_request));
+        s_reqIdToTokenizeFunctionCallRequest[_requestId] = _request;
+        _fulfillCreateEstateRequest(_requestId, _response);
+    }
+
     function _fulfillCreateEstateRequest(bytes32 _reqId, bytes memory _response) internal {
         TokenizeFunctionCallRequest memory _request = s_reqIdToTokenizeFunctionCallRequest[_reqId];
         
