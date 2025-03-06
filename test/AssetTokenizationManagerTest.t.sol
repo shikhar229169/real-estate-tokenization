@@ -7,6 +7,7 @@ import {TokenizedRealEstate} from "../src/TokenizedRealEstate.sol";
 import {AssetTokenizationManager} from "../src/AssetTokenizationManager.sol";
 import {DeployAssetTokenizationManager} from "../script/DeployAssetTokenizationManager.s.sol";
 import {HelperConfig} from "../script/HelperConfig.s.sol";
+import {VerifyingOperatorVault} from "../src/VerifyingOperatorVault.sol";
 import {RealEstateRegistry} from "../src/RealEstateRegistry.sol";
 
 contract AssetTokenizationManagerTest is Test {
@@ -15,19 +16,25 @@ contract AssetTokenizationManagerTest is Test {
     error AssetTokenizationManager__NotAssetOwner();
     error RealEstateRegistry__InvalidToken();
     error RealEstateRegistry__InvalidCollateral();
+    error RealEstateRegistry__InvalidENSName();
 
     TokenizedRealEstate public tokenizedRealEstate;
     address public user;
     address owner;
     uint256 ownerKey;
+    address slasher;
+    address signer;
     HelperConfig public helperConfig;
     HelperConfig.NetworkConfig public networkConfig;
     AssetTokenizationManager public assetTokenizationManager;
     DeployAssetTokenizationManager public deployer;
     RealEstateRegistry public realEstateRegistry;
+    VerifyingOperatorVault public verifyingOperatorVault;
 
     function setUp() public {
         (owner, ownerKey) = makeAddrAndKey("owner");
+        slasher = makeAddr("slasher");
+        signer = makeAddr("signer");
 
         deployer = new DeployAssetTokenizationManager();
         (assetTokenizationManager, helperConfig) = deployer.deploy(owner, ownerKey);
@@ -36,16 +43,18 @@ contract AssetTokenizationManagerTest is Test {
         address[] memory _acceptedTokens = new address[](1);
         _acceptedTokens[0] = networkConfig.link;
         address[] memory dataFeeds = new address[](1);
-        dataFeeds[0] = address(0x7);
+        dataFeeds[0] = makeAddr("dataFeed");
+        
+        verifyingOperatorVault = new VerifyingOperatorVault();
 
         vm.startPrank(address(owner));
         realEstateRegistry = new RealEstateRegistry(
-            address(0x1),
-            address(0x2),
+            slasher,
+            signer,
             1e18,
             _acceptedTokens,
             dataFeeds,
-            address(0x3),
+            address(verifyingOperatorVault),
             networkConfig.swapRouter,
             address(assetTokenizationManager)
         );
@@ -133,10 +142,7 @@ contract AssetTokenizationManagerTest is Test {
         _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
         address[] memory _estateOwnerAcrossChain = new address[](2);
-        // _estateOwnerAcrossChain[0] = address(0x1);
-        // _estateOwnerAcrossChain[1] = address(0x2);
-
-        // vm.deal(user, 1e18);
+        
         vm.startPrank(owner);
         assetTokenizationManager.setRegistry(address(realEstateRegistry));
         vm.stopPrank();
@@ -154,10 +160,7 @@ contract AssetTokenizationManagerTest is Test {
         _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
         address[] memory _estateOwnerAcrossChain = new address[](2);
-        // _estateOwnerAcrossChain[0] = address(0x1);
-        // _estateOwnerAcrossChain[1] = address(0x2);
-
-        // vm.deal(user, 1e18);
+        
         vm.startPrank(owner);
         assetTokenizationManager.setRegistry(address(realEstateRegistry));
         vm.stopPrank();
@@ -297,4 +300,36 @@ contract AssetTokenizationManagerTest is Test {
         vm.stopPrank();
         assertEq(realEstateRegistry.getFiatCollateralRequiredForOperator(), newOperatorCollateral);
     }
+
+    function test_approveOperatorVaultInvalidENSName() public {
+        string memory operatorVaultEns = "operatorVaultEns";
+        uint256 collateral = 50_000;
+
+        vm.startPrank(owner);
+        realEstateRegistry.setCollateralRequiredForOperator(collateral);
+        vm.expectRevert(RealEstateRegistry__InvalidENSName.selector);
+        realEstateRegistry.approveOperatorVault(operatorVaultEns);
+        vm.stopPrank();
+    }
+
+    // function test_approveOperatorVault__() public {
+    //     string memory operatorVaultEns = "operatorVaultEns";
+    //     uint256 collateral = 50_000;
+
+    //     vm.startPrank(signer);
+    //     realEstateRegistry.setCollateralRequiredForOperator(collateral);
+    //     realEstateRegistry.approveOperatorVault(operatorVaultEns);
+    //     vm.stopPrank();
+    // }
+
+    // function test_depositCollateralAndRegisterVault() public {
+    //     string memory operatorVaultEns = "operatorVaultEns";
+    //     uint256 collateral = 50_000;
+    //     bytes memory data = abi.encode(operatorVaultEns, networkConfig.link, 1e18);
+
+    //     vm.startPrank(owner);
+    //     realEstateRegistry.setCollateralRequiredForOperator(collateral);
+    //     realEstateRegistry.depositCollateralAndRegisterVault(operatorVaultEns, networkConfig.link, data, false);
+    //     vm.stopPrank();
+    // }
 }
