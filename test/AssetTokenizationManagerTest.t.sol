@@ -9,6 +9,8 @@ import {DeployAssetTokenizationManager} from "../script/DeployAssetTokenizationM
 import {HelperConfig} from "../script/HelperConfig.s.sol";
 import {VerifyingOperatorVault} from "../src/VerifyingOperatorVault.sol";
 import {RealEstateRegistry} from "../src/RealEstateRegistry.sol";
+import {MockERC20} from "../test/mocks/MockERC20Token.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract AssetTokenizationManagerTest is Test {
     error AssetTokenizationManager__BaseChainRequired();
@@ -24,6 +26,9 @@ contract AssetTokenizationManagerTest is Test {
     uint256 ownerKey;
     address slasher;
     address signer;
+    address nodeOperator;
+    uint256 signerKey;
+    ERC20 mockToken;
     HelperConfig public helperConfig;
     HelperConfig.NetworkConfig public networkConfig;
     AssetTokenizationManager public assetTokenizationManager;
@@ -34,7 +39,9 @@ contract AssetTokenizationManagerTest is Test {
     function setUp() public {
         (owner, ownerKey) = makeAddrAndKey("owner");
         slasher = makeAddr("slasher");
-        signer = makeAddr("signer");
+        (signer, signerKey) = makeAddrAndKey("signer");
+        nodeOperator = makeAddr("nodeOperator");
+        mockToken = new MockERC20();
 
         deployer = new DeployAssetTokenizationManager();
         (assetTokenizationManager, helperConfig) = deployer.deploy(owner, ownerKey);
@@ -333,27 +340,48 @@ contract AssetTokenizationManagerTest is Test {
     //     vm.stopPrank();
     // }
 
+    function prepareAndSignSignature(address _nodeOperaror, string memory _ensName) internal view returns (bytes memory _signature) {
+        bytes32 digest = realEstateRegistry.prepareRegisterVaultHash(_nodeOperaror, _ensName);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
+        _signature = abi.encodePacked(r, s, v);
+    }
+
     function test_fulfillCreateEstateRequest() public {
-        AssetTokenizationManager.TokenizeFunctionCallRequest memory request;
-        request.estateOwner = user;
-        request.chainsToDeploy = new uint256[](2);
-        request.chainsToDeploy[0] = networkConfig.supportedChains[0];
-        request.chainsToDeploy[1] = networkConfig.supportedChains[1];
-        request.paymentToken = networkConfig.link;
-        request.estateOwnerAcrossChain = new address[](2);
-        request.estateOwnerAcrossChain[0] = user;
-        request.estateOwnerAcrossChain[1] = makeAddr("owner");
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+        vm.startPrank(nodeOperator);
 
-        uint256 estateCost = 1e18;
-        uint256 percentageToTokenize = 50;
-        bool isApproved = true;
-        bytes memory _saltBytes = abi.encode(5802);
-        address _verifyingOperator = makeAddr("verifyingOperator");
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
 
-        bytes memory response = abi.encode(estateCost, percentageToTokenize, isApproved, _saltBytes, _verifyingOperator);
-        
-        vm.startPrank(owner);
-        assetTokenizationManager.createTestRequestIdResponse(request, response);
         vm.stopPrank();
+
+        vm.prank(owner);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+        
+        console.log(vault, "________________________________ghffu________");
+
+        // AssetTokenizationManager.TokenizeFunctionCallRequest memory request;
+        // request.estateOwner = user;
+        // request.chainsToDeploy = new uint256[](2);
+        // request.chainsToDeploy[0] = networkConfig.supportedChains[0];
+        // request.chainsToDeploy[1] = networkConfig.supportedChains[1];
+        // request.paymentToken = networkConfig.link;
+        // request.estateOwnerAcrossChain = new address[](2);
+        // request.estateOwnerAcrossChain[0] = user;
+        // request.estateOwnerAcrossChain[1] = makeAddr("owner");
+
+        // uint256 estateCost = 1e18;
+        // uint256 percentageToTokenize = 50;
+        // bool isApproved = true;
+        // bytes memory _saltBytes = abi.encode(5802);
+        // address _verifyingOperator = nodeOperator;
+
+        // bytes memory response = abi.encode(estateCost, percentageToTokenize, isApproved, _saltBytes, _verifyingOperator);
+        
+        // vm.startPrank(owner);
+        // assetTokenizationManager.createTestRequestIdResponse(request, response);
+        // vm.stopPrank();
     }
 }
