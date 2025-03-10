@@ -81,6 +81,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     event ValidatorAdded(address indexed validator);
     event ShareholderAdded(address indexed shareholder);
     event TokenizationRequestPlaced(bytes32 reqId, address estateOwner);
+    event TokenizedRealEstateDeployed(uint256 tokenId, address tokenizedRealEstate, address estateOwner);
 
     // modifiers
     modifier onlyEstateOwner(uint256 tokenId) {
@@ -290,6 +291,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         s_tokenCounter++;
 
         address tokenizedRealEstate = address(new TokenizedRealEstate{ salt: _salt }(_estateOwner, _estateCost, _percentageToTokenize, _tokenId, _paymentToken));
+        emit TokenizedRealEstateDeployed(_tokenId, tokenizedRealEstate, _estateOwner);
 
         s_tokenidToEstateInfo[_tokenId] = EstateInfo({
             estateOwner: _estateOwner,
@@ -355,8 +357,36 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return string.concat(_baseURI(), estateTokenUri);
     }
 
+    function getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) external view returns (address[] memory) {
+        return _getAllChainDeploymentAddr(_estateOwner, _estateCost, _percentageToTokenize, _tokenId, _salt, _paymentToken, _chainsToDeploy);
+    }
+
     function getEstateInfo(uint256 tokenId) external view returns (EstateInfo memory) {
         return s_tokenidToEstateInfo[tokenId];
+    }
+
+    function getEstateOwnerToTokeinzedRealEstate(address estateOwner) external view returns (address) {
+        return s_estateOwnerToTokenizedRealEstate[estateOwner];
+    }
+
+    function getCollateralDepositedBy(address estateOwner) external view returns (uint256) {
+        return s_getCollateralDepositedBy[estateOwner];
+    }
+
+    function getTokenCounter() external view returns (uint256) {
+        return s_tokenCounter;
+    }
+
+    function getIsSupportedChain(uint256 chainId) external view returns (bool) {
+        return s_isSupportedChain[chainId];
+    }
+
+    function getReqIdToTokenizeFunctionCallRequest(bytes32 reqId) external view returns (TokenizeFunctionCallRequest memory) {
+        return s_reqIdToTokenizeFunctionCallRequest[reqId];
+    }
+
+    function getTokenIdToChainIdToTokenizedRealEstate(uint256 tokenId, uint256 chainId) external view returns (address) {
+        return s_tokenIdToChainIdToTokenizedRealEstate[tokenId][chainId];
     }
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC721, EstateAcrossChain) returns (bool) {

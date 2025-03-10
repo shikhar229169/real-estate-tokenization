@@ -15,7 +15,9 @@ contract DeployAssetTokenizationManager is Script {
 
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
-        deploy(0x42fFD061E73331b2327a37AA306a0356859F9d1C, privateKey);
+        address owner = 0xF1c8170181364DeD1C56c4361DED2eB47f2eef1b;
+        // deploy(0x42fFD061E73331b2327a37AA306a0356859F9d1C, privateKey);
+        deploy(owner, privateKey);
     }
 
     function deploy(address owner, uint256 ownerKey) public returns (AssetTokenizationManager, VerifyingOperatorVault, RealEstateRegistry, USDC, HelperConfig) {
@@ -60,8 +62,8 @@ contract DeployAssetTokenizationManager is Script {
         uint256 collateralReqInFiat = 5;
 
         RealEstateRegistry realEstateRegistry = new RealEstateRegistry(
-            0x42fFD061E73331b2327a37AA306a0356859F9d1C,
-            0x42fFD061E73331b2327a37AA306a0356859F9d1C,
+            owner,
+            owner,
             collateralReqInFiat,
             acceptedTokens,
             dataFeedAddresses,

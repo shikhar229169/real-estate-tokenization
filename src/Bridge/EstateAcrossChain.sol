@@ -219,6 +219,10 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         IERC20(_token).safeTransfer(_beneficiary, amount);
     }
 
+    function getLinkToken() public view returns (IERC20) {
+        return s_linkToken;
+    }
+
     function supportsInterface(bytes4 interfaceId) public view virtual override(CCIPReceiver, AccessControl) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
