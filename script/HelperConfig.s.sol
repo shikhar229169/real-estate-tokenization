@@ -58,23 +58,42 @@ contract HelperConfig is Script {
 
     function getTestConfig() public view returns (NetworkConfig memory _networkConfig) {
         _networkConfig.swapRouter = address(0);//(Avalanche Fuji) -> (Arbitrum) Uniswap Router
-        _networkConfig.ccipRouter = 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165; 
-        _networkConfig.functionsRouter = 0x234a5fb5Bd614a7AA2FfAB244D603abFA0Ac5C5C;
+        _networkConfig.ccipRouter = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59; 
+        _networkConfig.functionsRouter = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;
         _networkConfig.subId_Acalanche = 15150;
-        _networkConfig.subId_Arbitrum = 354;
+        _networkConfig.subId_Arbitrum = 4389;
         _networkConfig.baseChainId = avalancheChainId;
-        _networkConfig.link = 0xb1D4538B4571d411F07960EF2838Ce337FE1E80E;
-        _networkConfig.donId = 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000;
+        _networkConfig.link = 0x779877A7B0D9E8603169DdbD7836e478b4624789;
+        _networkConfig.donId = 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000;
         _networkConfig.gasLimit = 21000;
         _networkConfig.supportedChains = new uint256[](2);
         _networkConfig.supportedChains[0] = avalancheChainId;
-        _networkConfig.supportedChains[1] = 421614;
+        _networkConfig.supportedChains[1] = 11155111;
         _networkConfig.chainSelectors = new uint64[](2);
         _networkConfig.chainSelectors[0] = 14767482510784806043;
-        _networkConfig.chainSelectors[1] = 3478487238524512106;
+        _networkConfig.chainSelectors[1] = 16015286601757825753;
         _networkConfig.estateVerificationSource = "";
         _networkConfig.encryptedSecretsUrls = "";
         return _networkConfig;
+
+        // _networkConfig.swapRouter = address(0);//(Avalanche Fuji) -> (Arbitrum) Uniswap Router
+        // _networkConfig.ccipRouter = 0xF694E193200268f9a4868e4Aa017A0118C9a8177; 
+        // _networkConfig.functionsRouter = 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0;
+        // _networkConfig.subId_Acalanche = 15150;
+        // _networkConfig.subId_Arbitrum = 4389;
+        // _networkConfig.baseChainId = avalancheChainId;
+        // _networkConfig.link = 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846;
+        // _networkConfig.donId = 0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000;
+        // _networkConfig.gasLimit = 21000;
+        // _networkConfig.supportedChains = new uint256[](2);
+        // _networkConfig.supportedChains[0] = avalancheChainId;
+        // _networkConfig.supportedChains[1] = 11155111;
+        // _networkConfig.chainSelectors = new uint64[](2);
+        // _networkConfig.chainSelectors[0] = 14767482510784806043;
+        // _networkConfig.chainSelectors[1] = 16015286601757825753;
+        // _networkConfig.estateVerificationSource = "";
+        // _networkConfig.encryptedSecretsUrls = "";
+        // return _networkConfig;
     }
 
     function getNetworkConfig() external view returns (NetworkConfig memory) {
