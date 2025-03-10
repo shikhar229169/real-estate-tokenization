@@ -41,6 +41,8 @@ contract AssetTokenizationManagerTest is Test {
     uint256 signerKey;
     uint256 fiatReqForCollateral_RER;
     ERC20 mockToken;
+    address[] token = new address[](1);
+    address[] dataFeeds = new address[](1);
 
     function setUp() public {
         vov = new VerifyingOperatorVault();
@@ -59,8 +61,7 @@ contract AssetTokenizationManagerTest is Test {
         MockV3Aggregator aggregator = new MockV3Aggregator(8, 3000e8);
         vm.stopPrank();
 
-        address[] memory token = new address[](1);
-        address[] memory dataFeeds = new address[](1);
+        
         token[0] = address(mockToken);
         dataFeeds[0] = address(aggregator);
 
@@ -282,5 +283,92 @@ contract AssetTokenizationManagerTest is Test {
         address vault = realEstateRegistry.getOperatorVault(nodeOperator);
 
         assertEq(VerifyingOperatorVault(vault).isAutoUpdateEnabled(), true);
+    }
+    
+    function testSetTokenForAnotherChainTokenNotOnBaseChain() public {
+        address tokenNotOnBaseChain = makeAddr("tokenNotOnBaseChain");
+        uint256 chainId = 11155111;
+        address tokenOnAnotherChain = makeAddr("tokenOnAnotherChain");
+        vm.startPrank(admin);
+        vm.expectRevert(RealEstateRegistry__InvalidToken.selector);
+        realEstateRegistry.setTokenForAnotherChain(tokenNotOnBaseChain, chainId, tokenOnAnotherChain);
+        vm.stopPrank();
+    }
+
+    function testSetTokenForAnotherChain() public {
+        address tokenNotOnBaseChain = token[0];
+        uint256 chainId = 11155111;
+        address tokenOnAnotherChain = makeAddr("tokenOnAnotherChain");
+        vm.startPrank(admin);
+        realEstateRegistry.setTokenForAnotherChain(tokenNotOnBaseChain, chainId, tokenOnAnotherChain);
+        vm.stopPrank();
+
+        assertEq(realEstateRegistry.getAcceptedTokenOnChain(tokenNotOnBaseChain, chainId), tokenOnAnotherChain);
+    }
+
+    function testSetCollateralRequiredForOperator() public {
+        uint256 newCollateral = 50_000;
+        vm.startPrank(admin);
+        realEstateRegistry.setCollateralRequiredForOperator(newCollateral);
+        vm.stopPrank();
+
+        assertEq(realEstateRegistry.getFiatCollateralRequiredForOperator(), newCollateral);
+    }
+
+    function testSetCollateralRequiredForOperatorLessThanOrMoreFIAT_COLLATERAL() public {
+        uint256 newCollateral = 30_000;
+        vm.startPrank(admin);
+        vm.expectRevert(RealEstateRegistry__InvalidCollateral.selector);
+        realEstateRegistry.setCollateralRequiredForOperator(newCollateral);
+        vm.stopPrank();
+
+        newCollateral = 1_30_000;
+        vm.startPrank(admin);
+        vm.expectRevert(RealEstateRegistry__InvalidCollateral.selector);
+        realEstateRegistry.setCollateralRequiredForOperator(newCollateral);
+        vm.stopPrank();
+    }
+
+    function testUpdateVOVImplementation() public {
+        address newImplementation = makeAddr("newImplementation");
+        vm.startPrank(admin);
+        realEstateRegistry.updateVOVImplementation(newImplementation);
+        vm.stopPrank();
+
+        assertEq(realEstateRegistry.getOperatorVaultImplementation(), newImplementation);
+    }
+
+    function testSetSwapRouter() public {
+        address newSwapRouter = makeAddr("newSwapRouter");
+        vm.startPrank(admin);
+        realEstateRegistry.setSwapRouter(newSwapRouter);
+        vm.stopPrank();
+
+        assertEq(realEstateRegistry.getSwapRouter(), newSwapRouter);
+    }
+
+    function testDepositCollateralAndRegisterVault() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, true);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+        
+        // address vault = realEstateRegistry.getOperatorVault(nodeOperator);
+        bool isApproved = realEstateRegistry.getOperatorInfo(nodeOperator).isApproved;
+        require(isApproved, "Vault not registered");
+        
+        vm.startPrank(slasher);
+        realEstateRegistry.slashOperatorVault("meow");
+        vm.stopPrank();
+        
+        isApproved = realEstateRegistry.getOperatorInfo(nodeOperator).isApproved;
+        require(!isApproved, "Vault registered");
     }
 }
