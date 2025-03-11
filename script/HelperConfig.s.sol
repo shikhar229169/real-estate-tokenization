@@ -57,6 +57,7 @@ contract HelperConfig is Script {
     }
 
     function getTestConfig() public view returns (NetworkConfig memory _networkConfig) {
+        // SEPOLIA //
         _networkConfig.swapRouter = address(0);//(Avalanche Fuji) -> (Arbitrum) Uniswap Router
         _networkConfig.ccipRouter = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59; 
         _networkConfig.functionsRouter = 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0;

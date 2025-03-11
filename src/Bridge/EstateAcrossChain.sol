@@ -39,6 +39,8 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
 
     bytes32 private s_lastReceivedMessageId; 
     bytes private s_lastReceivedData;
+    bool public testPhase;
+    bool public result = false;
 
     mapping(uint256 => uint64) public chainIdToSelector;
     mapping(uint64 => address) public chainSelectorToManager;
@@ -50,6 +52,7 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     /// @param _link The address of the link contract.
     constructor(address _router, address _link, uint256[] memory _chainId, uint64[] memory _chainSelector) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
+        testPhase = true;
 
         for (uint256 i = 0; i < _chainId.length; i++) {
             chainIdToSelector[_chainId[i]] = _chainSelector[i];
@@ -62,8 +65,11 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     /// @param _sourceChainSelector The selector of the source chain.
     /// @param _sender The address of the sender.
     modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
-        if (chainSelectorToManager[_sourceChainSelector] != _sender) {
+        if (chainSelectorToManager[_sourceChainSelector] != _sender && !testPhase) {
             revert SenderNotAllowlisted(_sender);
+        }
+        else {
+            result = (chainSelectorToManager[_sourceChainSelector] == _sender);
         }
         _;
     }
@@ -73,6 +79,10 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     modifier validateReceiver(address _receiver) {
         if (_receiver == address(0)) revert InvalidReceiverAddress();
         _;
+    }
+
+    function switchPhase() external onlyOwner {
+        testPhase = !testPhase;
     }
 
     /// @dev Updates the allowlist status of a sender for transactions.
@@ -152,6 +162,10 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     {
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedData = any2EvmMessage.data; // fetch the data
+
+        if (testPhase) {
+            return;
+        }
 
         _handleCrossChainMessage(s_lastReceivedMessageId, s_lastReceivedData);
 

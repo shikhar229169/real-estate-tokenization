@@ -13,19 +13,21 @@ contract CreateTokenizedRealEstate is Script {
         vm.startBroadcast(ownerKey);
         
         address usdc = address(0xF2b778E3f6Eb1Ab287B4c62918e64Dfc17A9762e);
+        // address owner = 0x42fFD061E73331b2327a37AA306a0356859F9d1C;
+        address owner = 0xF1c8170181364DeD1C56c4361DED2eB47f2eef1b;
         
-        // USDC(usdc).mint(1000000e6);
+        USDC(usdc).mint(owner, 1000000e18);
         USDC(usdc).approve(asset, type(uint256).max);
 
         AssetTokenizationManager.TokenizeFunctionCallRequest memory request;
-        request.estateOwner = 0x42fFD061E73331b2327a37AA306a0356859F9d1C;
+        request.estateOwner = owner;
         request.chainsToDeploy = new uint256[](2);
         request.chainsToDeploy[0] = 43113;
         request.chainsToDeploy[1] = 11155111;
         request.paymentToken = 0xF2b778E3f6Eb1Ab287B4c62918e64Dfc17A9762e;
         request.estateOwnerAcrossChain = new address[](2);
-        request.estateOwnerAcrossChain[0] = 0x42fFD061E73331b2327a37AA306a0356859F9d1C;
-        request.estateOwnerAcrossChain[1] = 0x42fFD061E73331b2327a37AA306a0356859F9d1C;
+        request.estateOwnerAcrossChain[0] = owner;
+        request.estateOwnerAcrossChain[1] = owner;
 
         uint256 estateCost = 1000;
         uint256 percentageToTokenize = 100e18;
