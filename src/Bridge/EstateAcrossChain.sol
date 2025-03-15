@@ -238,6 +238,6 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(CCIPReceiver, AccessControl) returns (bool) {
-        return super.supportsInterface(interfaceId);
+        return CCIPReceiver.supportsInterface(interfaceId) || AccessControl.supportsInterface(interfaceId);
     }
 }
