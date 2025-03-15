@@ -74,7 +74,7 @@ contract AssetTokenizationManagerTest is Test {
         user = makeAddr("user");
     }
 
-    function test_ccipReceiveWithData() public {
+    function test_ccipReceiveWithDataX() public {
         address router = networkConfig.ccipRouter;
 
         address tokenizationManagerSource = makeAddr("tokenizationManagerSource");
@@ -104,8 +104,14 @@ contract AssetTokenizationManagerTest is Test {
         vm.prank(owner);
         assetTokenizationManager.allowlistManager(14767482510784806043, tokenizationManagerSource);
 
+        vm.prank(owner);
+        assetTokenizationManager.switchPhase();
+
         vm.prank(router);
         assetTokenizationManager.ccipReceive(any2EvmMessage);
+
+        console.log(assetTokenizationManager.getEstateInfo(1).estateOwner, "estateOwner");
+        console.log(assetTokenizationManager.getEstateOwnerToTokeinzedRealEstate(estateOwner), "estateOwnerToTokeinzedRealEstate");
     }
 
     function test_ccipReceiveWithDataFork() public {
