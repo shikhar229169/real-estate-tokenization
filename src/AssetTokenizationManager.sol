@@ -13,7 +13,7 @@ import { FunctionsClient, FunctionsRequest } from "@chainlink/contracts/src/v0.8
 import { Base64 } from "@openzeppelin/contracts/utils/Base64.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import { console } from "forge-std/Test.sol";
+// import { console } from "forge-std/Test.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
@@ -69,18 +69,18 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     mapping(bytes32 reqId => TokenizeFunctionCallRequest) private s_reqIdToTokenizeFunctionCallRequest;
     mapping(uint256 => mapping(uint256 => address)) private s_tokenIdToChainIdToTokenizedRealEstate;
     bytes private s_latestError;
-    uint256 public constant ESTATE_OWNER_COLLATERAL_USD = 200;
+    uint256 private constant ESTATE_OWNER_COLLATERAL_USD = 200;
 
     EstateVerificationFunctionsParams private s_estateVerificationFunctionsParams;
 
-    uint256 public constant CCIP_DEPLOY_TOKENIZED_REAL_ESTATE = 1;
+    uint256 private constant CCIP_DEPLOY_TOKENIZED_REAL_ESTATE = 1;
 
     uint256 private constant MAX_DECIMALS_SHARE_PERCENTAGE = 5;
     uint256 private constant TOTAL_TRE = 1e6 * 1e18;
 
     // events
-    event ValidatorAdded(address indexed validator);
-    event ShareholderAdded(address indexed shareholder);
+    event ValidatorAdded(address validator);
+    event ShareholderAdded(address shareholder);
     event TokenizationRequestPlaced(bytes32 reqId, address estateOwner);
     event TokenizedRealEstateDeployed(uint256 tokenId, address tokenizedRealEstate, address estateOwner);
 
@@ -257,12 +257,6 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         IERC20(_paymentToken).safeTransferFrom(_estateOwner, address(this), collateralAmount);
     }
 
-    /// @dev callable only from estate owner tokenized real estate contract (inlude some delay for consideration)
-    /// @notice handles for estate owner not providing regular collateral updates per month basis
-    function slashEstateOwnerCollateral() external {
-        
-    }
-
     function handleTestCrossChainMessage(bytes32 _messageId, bytes memory _data) external {
         _handleCrossChainMessage(_messageId, _data);
     }
@@ -274,7 +268,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
             ccipRequestType := mload(add(_data, 0x20))
         }
 
-        console.log("ME HU BHAI:", ccipRequestType);
+        // console.log("ME HU BHAI:", ccipRequestType);
 
         if (ccipRequestType == CCIP_DEPLOY_TOKENIZED_REAL_ESTATE) {
             _handleDeployTokenizedRealEstate(_data);
@@ -342,27 +336,27 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return "data:application/json;base64,";
     }
 
-    function tokenURI(uint256 _tokenId) public view override returns (string memory) {
-        EstateInfo memory estateInfo = s_tokenidToEstateInfo[_tokenId];
+    // function tokenURI(uint256 _tokenId) public view override returns (string memory) {
+    //     EstateInfo memory estateInfo = s_tokenidToEstateInfo[_tokenId];
         
-        string memory estateTokenUri = Base64.encode(
-            abi.encodePacked(
-                '{"name": "Tokenized Estate #', Strings.toString(_tokenId),
-                '", "description": "This NFT represents a tokenized real estate asset",',
-                '"attributes": {',
-                    '"estateOwner": "', Strings.toHexString(estateInfo.estateOwner),
-                    '", "percentageToTokenize": "', Strings.toString(estateInfo.percentageToTokenize),
-                    '", "tokenizedRealEstate": "', Strings.toHexString(estateInfo.tokenizedRealEstate),
-                    '", "estateCost": "', Strings.toString(estateInfo.estateCost),
-                    '", "accumulatedRewards": "', Strings.toString(estateInfo.accumulatedRewards),
-                    '", "verifyingOperator": "', Strings.toHexString(estateInfo.verifyingOperator),
-                '"}'
-                '}'
-            )
-        );
+    //     string memory estateTokenUri = Base64.encode(
+    //         abi.encodePacked(
+    //             '{"name": "Tokenized Estate #', Strings.toString(_tokenId),
+    //             '", "description": "This NFT represents a tokenized real estate asset",',
+    //             '"attributes": {',
+    //                 '"estateOwner": "', Strings.toHexString(estateInfo.estateOwner),
+    //                 '", "percentageToTokenize": "', Strings.toString(estateInfo.percentageToTokenize),
+    //                 '", "tokenizedRealEstate": "', Strings.toHexString(estateInfo.tokenizedRealEstate),
+    //                 '", "estateCost": "', Strings.toString(estateInfo.estateCost),
+    //                 '", "accumulatedRewards": "', Strings.toString(estateInfo.accumulatedRewards),
+    //                 '", "verifyingOperator": "', Strings.toHexString(estateInfo.verifyingOperator),
+    //             '"}'
+    //             '}'
+    //         )
+    //     );
 
-        return string.concat(_baseURI(), estateTokenUri);
-    }
+    //     return string.concat(_baseURI(), estateTokenUri);
+    // }
 
     function getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) external view returns (address[] memory) {
         return _getAllChainDeploymentAddr(_estateOwner, _estateCost, _percentageToTokenize, _tokenId, _salt, _paymentToken, _chainsToDeploy);
@@ -376,21 +370,21 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return s_estateOwnerToTokenizedRealEstate[estateOwner];
     }
 
-    function getCollateralDepositedBy(address estateOwner) external view returns (uint256) {
-        return s_getCollateralDepositedBy[estateOwner];
-    }
+    // function getCollateralDepositedBy(address estateOwner) external view returns (uint256) {
+    //     return s_getCollateralDepositedBy[estateOwner];
+    // }
 
-    function getTokenCounter() external view returns (uint256) {
-        return s_tokenCounter;
-    }
+    // function getTokenCounter() external view returns (uint256) {
+    //     return s_tokenCounter;
+    // }
 
-    function getIsSupportedChain(uint256 chainId) external view returns (bool) {
-        return s_isSupportedChain[chainId];
-    }
+    // function getIsSupportedChain(uint256 chainId) external view returns (bool) {
+    //     return s_isSupportedChain[chainId];
+    // }
 
-    function getReqIdToTokenizeFunctionCallRequest(bytes32 reqId) external view returns (TokenizeFunctionCallRequest memory) {
-        return s_reqIdToTokenizeFunctionCallRequest[reqId];
-    }
+    // function getReqIdToTokenizeFunctionCallRequest(bytes32 reqId) external view returns (TokenizeFunctionCallRequest memory) {
+    //     return s_reqIdToTokenizeFunctionCallRequest[reqId];
+    // }
 
     function getTokenIdToChainIdToTokenizedRealEstate(uint256 tokenId, uint256 chainId) external view returns (address) {
         return s_tokenIdToChainIdToTokenizedRealEstate[tokenId][chainId];
@@ -400,17 +394,17 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return ERC721.supportsInterface(interfaceId) || EstateAcrossChain.supportsInterface(interfaceId);
     }
 
-    function getBaseChain() external view returns (uint256) {
-        return i_baseChain;
-    }
+    // function getBaseChain() external view returns (uint256) {
+    //     return i_baseChain;
+    // }
 
-    function getSupportedChains() external view returns (uint256[] memory) {
-        return s_supportedChains;
-    }
+    // function getSupportedChains() external view returns (uint256[] memory) {
+    //     return s_supportedChains;
+    // }
 
-    function getLatestError() external view returns (bytes memory) {
-        return s_latestError;
-    }
+    // function getLatestError() external view returns (bytes memory) {
+    //     return s_latestError;
+    // }
 
     // function _calculateNetAmountForShares(uint256 percentageForShareholders, uint256 amountOfAsset)
     //     internal
