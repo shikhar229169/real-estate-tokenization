@@ -199,13 +199,56 @@ contract AssetTokenizationManagerTest is Test {
         // console.log(info.estateCost, "percentageToTokenize");
     }
 
-    function test_ConstructorAssetTokenizationManager() public view {
-        assertEq(assetTokenizationManager.getBaseChain(), networkConfig.baseChainId);
-        uint256[] memory supportedChains = assetTokenizationManager.getSupportedChains();
-        for (uint256 i = 0; i < supportedChains.length; i++) {
-            assertEq(supportedChains[i], networkConfig.supportedChains[i]);
-        }
+
+    function test_ccipReceiveWithDataFork_Curr() public {
+        address router = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
+
+        address tokenizationManagerSource = 0x51002D2d366779b4C2CEDf817c47fB4eFfa928CE;
+        AssetTokenizationManager currATM = AssetTokenizationManager(0xE3311eb12426c4e19f4a655330a5d47973815b1A);
+
+        address estateOwner = 0x697F5E7a089e1621EA329FE4e906EA45D16E79c6;
+        // uint256 MESSAGE_TYPE = 1;
+        // uint256 estateCost = 1000;
+        // uint256 percentageToTokenize = 100e18;
+        uint256 tokenId = 1;
+        // bytes32 salt = bytes32(bytes("7000"));
+        // address paymentToken = address(usdc);
+        // uint256[] memory chainsToDeploy = new uint256[](2);
+        // chainsToDeploy[0] = networkConfig.supportedChains[0];
+        // chainsToDeploy[1] = networkConfig.supportedChains[1];
+        // address[] memory deploymentAddrForOtherChains = new address[](2);
+        // deploymentAddrForOtherChains[0] = makeAddr("deploymentAddrForOtherChains0");
+        // deploymentAddrForOtherChains[1] = makeAddr("deploymentAddrForOtherChains1");
+
+        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+            messageId: 0xfc34e0b36b57a9930766c2b8237ec43af2d0f30de225036a37da0fcb87039c57,
+            sourceChainSelector: 14767482510784806043, // 43113
+            sender: abi.encode(tokenizationManagerSource),
+            data: hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000697f5e7a089e1621ea329fe4e906ea45d16e79c600000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000137303030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000003b9c38ddbe817335c8aea40204938ab42186c969000000000000000000000000de482fd8265dbad60dd5c0761ab8ccc848a71699",
+            destTokenAmounts: new Client.EVMTokenAmount[](0)
+        });
+
+        console.log("Total Supply:", currATM.balanceOf(estateOwner));
+
+        vm.prank(router);
+        currATM.ccipReceive(any2EvmMessage);
+
+        // AssetTokenizationManager.EstateInfo memory info = currATM.getEstateInfo(2);
+        console.log("Total Supply:", currATM.balanceOf(estateOwner));
+        console.log("Owner:", currATM.ownerOf(tokenId));
+        // console.log(info.estateOwner, "estateOwner");
+        // console.log(info.percentageToTokenize, "percentageToTokenize");
+        // console.log(info.tokenizedRealEstate, "percentageToTokenize");
+        // console.log(info.estateCost, "percentageToTokenize");
     }
+
+    // function test_ConstructorAssetTokenizationManager() public view {
+    //     assertEq(assetTokenizationManager.getBaseChain(), networkConfig.baseChainId);
+    //     uint256[] memory supportedChains = assetTokenizationManager.getSupportedChains();
+    //     for (uint256 i = 0; i < supportedChains.length; i++) {
+    //         assertEq(supportedChains[i], networkConfig.supportedChains[i]);
+    //     }
+    // }
 
     function test_createTokenizedRealEstate_IsBaseChainRequired() public {
         uint256[] memory _chainsToDeploy = new uint256[](2);
