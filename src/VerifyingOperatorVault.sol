@@ -52,6 +52,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     bool private s_isAutoUpdateEnabled;
     address private immutable i_thisContract;
     address[] private s_tokenizedRealEstateAddresses;
+    mapping(address tokenizedRealEstate => bool) private s_isTokenizedRealEstate;
     bool private s_isSlashed;
 
     mapping(address user => UserDepositInfo) private s_userDepositInfo;
@@ -174,7 +175,9 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
      * @dev the respective tokenized real estate contract approves this contract to spend the reward tokens
      * @return utilizedAmount The amount of reward token utilized (ensuring TRE uses them back for incentive pool of real estate token holders)
      */
-    function receiveRewards(address _rewardToken, uint256 _amount) external onlyTokenizationManager returns (uint256 utilizedAmount) {
+    function receiveRewards(address _rewardToken, uint256 _amount) external returns (uint256 utilizedAmount) {
+        require(s_isTokenizedRealEstate[msg.sender], VerifyingOperatorVault__NotAuthorized());
+
         uint256 _receivedAmount;
         uint256 _receivedAmountVaultNative;
 
@@ -249,6 +252,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
 
     function addNewTokenizedRealEstate(address _tokenizedRealEstate) external onlyTokenizationManager {
         s_tokenizedRealEstateAddresses.push(_tokenizedRealEstate);
+        s_isTokenizedRealEstate[_tokenizedRealEstate] = true;
         emit TokenizedRealEstateAdded(_tokenizedRealEstate);
     }
 

@@ -31,6 +31,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     error AssetTokenizationManager__OnlyOneTokenizedRealEstatePerUser();
     error AssetTokenizationManager__BaseChainRequired();
     error AssetTokenizationManager__TokenNotWhitelisted();
+    error AssetTokenizationManager__NotAuthorized();
 
     // Structs
     struct EstateInfo {
@@ -74,6 +75,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     EstateVerificationFunctionsParams private s_estateVerificationFunctionsParams;
 
     uint256 private constant CCIP_DEPLOY_TOKENIZED_REAL_ESTATE = 1;
+    uint256 private constant CCIP_REQUEST_MINT_TOKENS = 2;
 
     uint256 private constant MAX_DECIMALS_SHARE_PERCENTAGE = 5;
     uint256 private constant TOTAL_TRE = 1e6 * 1e18;
@@ -173,6 +175,12 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         return reqId;
     }
 
+    function bridgeRequestFromTRE(bytes memory _data, uint256 _gasLimit, uint256 _destChainId, uint256 _tokenId) external {
+        address tokenizedRealEstate = s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate;
+        require(msg.sender == tokenizedRealEstate, AssetTokenizationManager__NotAuthorized());
+        bridgeRequest(chainIdToSelector[_destChainId], _data, _gasLimit);
+    }
+
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         _fulfillCreateEstateRequest(requestId, response);
         s_latestError = err;
@@ -234,7 +242,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
             bytes memory bridgeData = abi.encode(CCIP_DEPLOY_TOKENIZED_REAL_ESTATE, _request.estateOwnerAcrossChain[i], estateCost, percentageToTokenize, _tokenId, _salt, _paymentTokenOnChain, _request.chainsToDeploy, _deploymentAddrForOtherChains);
             uint256 _chainId = _request.chainsToDeploy[i];
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainId] = _deploymentAddrForOtherChains[i];
-            bridgeRequest(_chainId, bridgeData, 500_000);
+            bridgeRequest(_chainId, bridgeData, 900_000);
         }
     }
 
@@ -273,6 +281,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         if (ccipRequestType == CCIP_DEPLOY_TOKENIZED_REAL_ESTATE) {
             _handleDeployTokenizedRealEstate(_data);
         }
+        else if (ccipRequestType == CCIP_REQUEST_MINT_TOKENS) {
+            _handleMintTokenRequestFromNonBaseChain(_data);
+        }
     }
 
     function _handleDeployTokenizedRealEstate(bytes memory _data) internal {
@@ -308,6 +319,25 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         for (uint256 i = 0; i < _chainsToDeploy.length; i++) {
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainsToDeploy[i]] = _deploymentAddrForOtherChains[i];
         }
+    }
+
+    function _handleMintTokenRequestFromNonBaseChain(bytes memory _data) internal {
+        (
+            ,
+            address _user,
+            uint256 _tokensToMint,
+            uint256 _sourceChainId,
+            /* address sourceTokenizedRealEstate */,
+            uint256 _tokenId,
+            bool _mintIfLess
+        ) = abi.decode(_data, (uint256, address, uint256, uint256, address, uint256, bool));
+
+        // call the tokenized real estate on the current chain, i.e. base chain (avalanche chain)
+        TokenizedRealEstate _tre = TokenizedRealEstate(s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][block.chainid]);
+        (bool _success, uint256 _tokensMinted) = _tre.mintTokensFromAnotherChainRequest(_user, _tokensToMint, _sourceChainId, _mintIfLess);
+
+        // prepare message to send on the source chain
+        // bytes memory _ccipData = abi.encode()
     }
 
     function _getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) internal view returns (address[] memory) {
@@ -368,6 +398,10 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
 
     function getEstateOwnerToTokeinzedRealEstate(address estateOwner) external view returns (address) {
         return s_estateOwnerToTokenizedRealEstate[estateOwner];
+    }
+
+    function getRegistry() external view returns (address) {
+        return s_registry;
     }
 
     // function getCollateralDepositedBy(address estateOwner) external view returns (uint256) {
