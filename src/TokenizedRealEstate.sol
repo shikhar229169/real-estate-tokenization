@@ -42,7 +42,6 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     uint256 private s_perEstateTokenRewardStored;
     mapping(address estateTokenHolder => uint256 perTokenRewardClaimed) private s_perEstateTokenRewardClaimedBy;
     mapping(address estateTokenHolder => uint256 rewards) private s_claimableRewards;
-    // mapping(address => shareHolderInfo) private s_shareHolderToShareHolderInfo;
 
     uint8 private constant MAX_DECIMALS = 18;
     uint256 private constant TOTAL_TRE_SUPPLY = 1e6 * 1e18;
@@ -50,14 +49,6 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     uint256 private constant COLLATERAL_REQUIRED = 120e18;
     uint256 private constant PERCENT_PRECISION = 100e18;
     uint256 public constant BASE_CHAIN_ID = 43113;
-
-    // struct shareHolderInfo {
-    //     uint256 tokenId;
-    //     address shareholder;
-    //     uint256 sharesAmount;
-    //     uint256 fractionalShares;
-    //     uint256 rentAmountIn;
-    // }
 
     // Events
     event CollateralDeposited(address depositor, uint256 collateralAmount);
@@ -78,10 +69,10 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         _;
     }
 
-    modifier updateReward() {
-        uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * s_estateTokenOwnershipMinted[msg.sender]) / PRECISION;
-        s_perEstateTokenRewardClaimedBy[msg.sender] = s_perEstateTokenRewardStored;
-        s_claimableRewards[msg.sender] += reward;
+    modifier updateReward(address _user) {
+        uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[_user]) * balanceOf(_user)) / PRECISION;
+        s_perEstateTokenRewardClaimedBy[_user] = s_perEstateTokenRewardStored;
+        s_claimableRewards[_user] += reward;
         _;
     }
 
@@ -114,7 +105,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
      * @param tokensToMint The amount of tokens to mint for collateral
      * @notice Calculates the amount of collateral with 120% over collateralization, takes collateral from user if not enough, and then mints the partial ownership tokens
      */
-    function buyRealEstatePartialOwnershipWithCollateral(uint256 tokensToMint) external updateReward {
+    function buyRealEstatePartialOwnershipWithCollateral(uint256 tokensToMint) external updateReward(msg.sender) {
         require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
         uint256 tokensAvailableForMint = TOTAL_TRE_SUPPLY - totalSupply();
         require(tokensToMint <= tokensAvailableForMint, TokenizedRealEstate__NotEnoughTokensToMint());
@@ -150,7 +141,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
     }
 
-    function mintTokensFromAnotherChainRequest(address _user, uint256 _tokensToMint, uint256 _sourceChainId, bool _mintIfLess) external onlyAssetTokenizationManager returns (bool _success, uint256 _tokensMinted) {
+    function mintTokensFromAnotherChainRequest(address _user, uint256 _tokensToMint, uint256 _sourceChainId, bool _mintIfLess) external onlyAssetTokenizationManager updateReward(_user) returns (bool _success, uint256 _tokensMinted) {
         require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
         uint256 tokensAvailableForMint = TOTAL_TRE_SUPPLY - totalSupply();
                 
@@ -185,18 +176,27 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         }
     }
 
-    function burnEstateOwnershipTokens(uint256 tokensToBurn, uint256 gasLimit) external updateReward {
+    function burnEstateOwnershipTokens(uint256 tokensToBurn) external updateReward(msg.sender) {
+        require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
+
         s_estateTokenOwnershipMinted[msg.sender] -= tokensToBurn;
         emit EstateOwnershipTokensBurnt(msg.sender, tokensToBurn);
         _burn(msg.sender, tokensToBurn);
-        if (block.chainid != BASE_CHAIN_ID) {
-            // send a call to base chain to burn the tokens
-            bytes memory _ccipData = abi.encode(CCIP_REQUEST_BURN_TOKENS, msg.sender, tokensToBurn, block.chainid, address(this), i_tokenId);
-            AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
-        }
     }
 
-    function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager {
+    function burnEstateOwnershipTokensOnNonBaseChain(uint256 tokensToBurn, uint256 gasLimit) external {
+        require(block.chainid != BASE_CHAIN_ID, TokenizedRealEstate__NotAllowedOnBaseChain());
+        
+        s_estateTokenOwnershipMinted[msg.sender] -= tokensToBurn;
+        emit EstateOwnershipTokensBurnt(msg.sender, tokensToBurn);
+        _burn(msg.sender, tokensToBurn);
+
+        // send a call to base chain to burn the tokens
+        bytes memory _ccipData = abi.encode(CCIP_REQUEST_BURN_TOKENS, msg.sender, tokensToBurn, block.chainid, address(this), i_tokenId);
+        AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
+    }
+
+    function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager updateReward(msg.sender) {
         require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
         s_estateTokenOwnershipMintedForAnotherChain[_user][_sourceChainId] -= _tokensToBurn;
         emit EstateOwnershipTokensBurnt(_user, _tokensToBurn);
@@ -219,7 +219,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     // @todo rewards for another chain
 
     function claimRewardsForEstateOwnershipTokens() external {
-        uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * s_estateTokenOwnershipMinted[msg.sender]) / PRECISION;
+        uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * balanceOf(msg.sender)) / PRECISION;
         s_perEstateTokenRewardClaimedBy[msg.sender] = s_perEstateTokenRewardStored;
         reward += s_claimableRewards[msg.sender];
         s_claimableRewards[msg.sender] = 0;
