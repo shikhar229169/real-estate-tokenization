@@ -13,13 +13,14 @@ import { FunctionsClient, FunctionsRequest } from "@chainlink/contracts/src/v0.8
 import { Base64 } from "@openzeppelin/contracts/utils/Base64.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { CcipRequestTypes } from "./CcipRequestTypes.sol";
 // import { console } from "forge-std/Test.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
 }
 
-contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient {
+contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient, CcipRequestTypes {
     // libraries
     using SafeERC20 for IERC20;
     using FunctionsRequest for FunctionsRequest.Request;
@@ -70,13 +71,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
     mapping(bytes32 reqId => TokenizeFunctionCallRequest) private s_reqIdToTokenizeFunctionCallRequest;
     mapping(uint256 => mapping(uint256 => address)) private s_tokenIdToChainIdToTokenizedRealEstate;
     bytes private s_latestError;
-    uint256 private constant ESTATE_OWNER_COLLATERAL_USD = 200;
-
     EstateVerificationFunctionsParams private s_estateVerificationFunctionsParams;
 
-    uint256 private constant CCIP_DEPLOY_TOKENIZED_REAL_ESTATE = 1;
-    uint256 private constant CCIP_REQUEST_MINT_TOKENS = 2;
-
+    uint256 private constant ESTATE_OWNER_COLLATERAL_USD = 200;
     uint256 private constant MAX_DECIMALS_SHARE_PERCENTAGE = 5;
     uint256 private constant TOTAL_TRE = 1e6 * 1e18;
 
@@ -284,6 +281,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         else if (ccipRequestType == CCIP_REQUEST_MINT_TOKENS) {
             _handleMintTokenRequestFromNonBaseChain(_data);
         }
+        else if (ccipRequestType == CCIP_MINT_REQUEST_ACK) {
+            _handleMintTokenAckRequest(_data);
+        }
     }
 
     function _handleDeployTokenizedRealEstate(bytes memory _data) internal {
@@ -337,7 +337,20 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient 
         (bool _success, uint256 _tokensMinted) = _tre.mintTokensFromAnotherChainRequest(_user, _tokensToMint, _sourceChainId, _mintIfLess);
 
         // prepare message to send on the source chain
-        // bytes memory _ccipData = abi.encode()
+        bytes memory _ccipData = abi.encode(CCIP_MINT_REQUEST_ACK, _user, _tokensToMint, _tokensMinted, _tokenId, _success);
+        bridgeRequest(_sourceChainId, _ccipData, 600_000);
+    }
+
+    function _handleMintTokenAckRequest(bytes memory _data) internal {
+        (
+            /* ccipMesageType */, 
+            address _user, 
+            uint256 _tokensToMint,
+            uint256 _tokensMinted, 
+            uint256 _tokenId, 
+            bool _success
+        ) = abi.decode(_data, (uint256, address, uint256, uint256, uint256, bool));
+        TokenizedRealEstate(s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate).fulfillBuyRealEstateOwnershipOnNonBaseChain(_user, _tokensToMint, _tokensMinted, _success);
     }
 
     function _getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) internal view returns (address[] memory) {

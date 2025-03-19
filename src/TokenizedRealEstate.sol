@@ -11,12 +11,13 @@ import { IRealEstateRegistry } from "./interfaces/IRealEstateRegistry.sol";
 import { IVerifyingOperatorVault } from "./interfaces/IVerifyingOperatorVault.sol";
 import { AggregatorV3Interface } from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
+import { CcipRequestTypes } from "./CcipRequestTypes.sol";
 
 interface IERC20Decimals {
     function decimals() external view returns (uint8);
 }
 
-contract TokenizedRealEstate is ERC20 {
+contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     using SafeERC20 for IERC20; 
 
     error TokenizedRealEstate__ZeroEthSent();
@@ -25,7 +26,7 @@ contract TokenizedRealEstate is ERC20 {
     error TokenizedRealEstate__NotEnoughTokensToMint();
     error TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt();
     error TokenizedRealEstate__OnlyEstateOwner();
-    error TokenizedRealEstate__AlreadyOnBaseChain();
+    error TokenizedRealEstate__NotAllowedOnBaseChain();
     error TokenizedRealEstate__NotOnBaseChain();
     
     address private immutable i_assetTokenizationManager;
@@ -50,9 +51,6 @@ contract TokenizedRealEstate is ERC20 {
     uint256 private constant PERCENT_PRECISION = 100e18;
     uint256 public constant BASE_CHAIN_ID = 43113;
 
-    uint256 private constant CCIP_DEPLOY_TOKENIZED_REAL_ESTATE = 1;
-    uint256 private constant CCIP_REQUEST_MINT_TOKENS = 2;
-
     // struct shareHolderInfo {
     //     uint256 tokenId;
     //     address shareholder;
@@ -65,6 +63,7 @@ contract TokenizedRealEstate is ERC20 {
     event CollateralDeposited(address depositor, uint256 collateralAmount);
     event EstateOwnershipTokensMinted(address user, uint256 estateOwnershipTokensMinted);
     event RewardsAccumulated(uint256 currRewardsAvailable, uint256 perEstateTokenRewardStored);
+    event EstateOwnershipTokenMintFailed(address user, uint256 tokensToMint, uint256 tokensMintedPossible);
 
     modifier onlyAssetTokenizationManager() {
         if (msg.sender != i_assetTokenizationManager) {
@@ -141,7 +140,7 @@ contract TokenizedRealEstate is ERC20 {
     function buyRealEstatePartialOwnershipOnNonBaseChain(uint256 tokensToMint, bool mintIfLess, uint256 gasLimit) external {
         // check for enough collateral
         require(_hasEnoughCollateralForTokens(msg.sender, s_estateTokenOwnershipMinted[msg.sender] + s_pendingEstateTokenOwnershipToMint[msg.sender] + tokensToMint), TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt());
-        require(block.chainid != BASE_CHAIN_ID, TokenizedRealEstate__AlreadyOnBaseChain());
+        require(block.chainid != BASE_CHAIN_ID, TokenizedRealEstate__NotAllowedOnBaseChain());
 
         s_pendingEstateTokenOwnershipToMint[msg.sender] += tokensToMint;
 
@@ -166,9 +165,22 @@ contract TokenizedRealEstate is ERC20 {
         if (_success) {
             // mint _tokensMinted to _user in another variable storing the chain id on which it is minted
             s_estateTokenOwnershipMintedForAnotherChain[_user][_sourceChainId] += _tokensMinted;
+            emit EstateOwnershipTokensMinted(_user, _tokensMinted);
+            _mint(_user, _tokensMinted);
+        }
+    }
+
+    function fulfillBuyRealEstateOwnershipOnNonBaseChain(address _user, uint256 _tokensToMint, uint256 _tokensMinted, bool _success) external onlyAssetTokenizationManager {
+        require(block.chainid != BASE_CHAIN_ID, TokenizedRealEstate__NotAllowedOnBaseChain());
+        s_pendingEstateTokenOwnershipToMint[_user] -= _tokensToMint;
+        
+        if (_success) {
             s_estateTokenOwnershipMinted[_user] += _tokensMinted;
             emit EstateOwnershipTokensMinted(_user, _tokensMinted);
             _mint(_user, _tokensMinted);
+        }
+        else {
+            emit EstateOwnershipTokenMintFailed(_user, _tokensToMint, _tokensMinted);
         }
     }
 
@@ -183,6 +195,8 @@ contract TokenizedRealEstate is ERC20 {
         require(_hasEnoughCollateral(msg.sender), TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt());
         IERC20(i_paymentToken).safeTransfer(msg.sender, collateralAmount);
     }
+
+    // @todo rewards for another chain
 
     function claimRewardsForEstateOwnershipTokens() external {
         uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * s_estateTokenOwnershipMinted[msg.sender]) / PRECISION;
@@ -240,6 +254,18 @@ contract TokenizedRealEstate is ERC20 {
 
     function getCurrentOnChainTokenizedAmount() public view returns (uint256) {
         return (i_percentageToTokenize * s_estateCost) / PERCENT_PRECISION;
+    }
+
+    function getCollateralDepositedBy(address user) external view returns (uint256) {
+        return s_collateralDeposited[user];
+    }
+
+    function getEstateTokensMintedBy(address user) external view returns (uint256) {
+        return s_estateTokenOwnershipMinted[user];
+    }
+
+    function getEstateTokensMintedOnChainBy(address user, uint256 chainId) external view returns (uint256) {
+        return s_estateTokenOwnershipMintedForAnotherChain[user][chainId];
     }
 
     function getPerEstateTokenPrice() public view returns (uint256) {
