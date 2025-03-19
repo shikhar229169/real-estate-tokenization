@@ -175,7 +175,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
     function bridgeRequestFromTRE(bytes memory _data, uint256 _gasLimit, uint256 _destChainId, uint256 _tokenId) external {
         address tokenizedRealEstate = s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate;
         require(msg.sender == tokenizedRealEstate, AssetTokenizationManager__NotAuthorized());
-        bridgeRequest(chainIdToSelector[_destChainId], _data, _gasLimit);
+        bridgeRequest(_destChainId, _data, _gasLimit);
     }
 
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
@@ -284,6 +284,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
         else if (ccipRequestType == CCIP_MINT_REQUEST_ACK) {
             _handleMintTokenAckRequest(_data);
         }
+        else if (ccipRequestType == CCIP_REQUEST_BURN_TOKENS) {
+            _handleBurnTokenRequestFromNonBaseChain(_data);
+        }
     }
 
     function _handleDeployTokenizedRealEstate(bytes memory _data) internal {
@@ -351,6 +354,19 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
             bool _success
         ) = abi.decode(_data, (uint256, address, uint256, uint256, uint256, bool));
         TokenizedRealEstate(s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate).fulfillBuyRealEstateOwnershipOnNonBaseChain(_user, _tokensToMint, _tokensMinted, _success);
+    }
+
+    function _handleBurnTokenRequestFromNonBaseChain(bytes memory _data) internal {
+        (
+            /* CCIP_REQUEST_BURN_TOKENS */, 
+            address user, 
+            uint256 tokensToBurn, 
+            uint256 sourceChainId, 
+            address sourceTokenizedRealEstate, 
+            uint256 tokenId
+        ) = abi.decode(_data, (uint256, address, uint256, uint256, address, uint256));
+        TokenizedRealEstate _tre = TokenizedRealEstate(s_tokenIdToChainIdToTokenizedRealEstate[tokenId][block.chainid]);
+        _tre.burnTokensFromAnotherChainRequest(user, tokensToBurn, sourceChainId);
     }
 
     function _getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) internal view returns (address[] memory) {

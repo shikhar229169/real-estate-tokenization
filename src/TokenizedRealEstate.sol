@@ -62,6 +62,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     // Events
     event CollateralDeposited(address depositor, uint256 collateralAmount);
     event EstateOwnershipTokensMinted(address user, uint256 estateOwnershipTokensMinted);
+    event EstateOwnershipTokensBurnt(address user, uint256 estateOwnershipTokensBurnt);
     event RewardsAccumulated(uint256 currRewardsAvailable, uint256 perEstateTokenRewardStored);
     event EstateOwnershipTokenMintFailed(address user, uint256 tokensToMint, uint256 tokensMintedPossible);
 
@@ -184,15 +185,34 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         }
     }
 
-    function burnEstateOwnershipTokens(uint256 tokensToBurn) external updateReward {
+    function burnEstateOwnershipTokens(uint256 tokensToBurn, uint256 gasLimit) external updateReward {
         s_estateTokenOwnershipMinted[msg.sender] -= tokensToBurn;
+        emit EstateOwnershipTokensBurnt(msg.sender, tokensToBurn);
         _burn(msg.sender, tokensToBurn);
+        if (block.chainid != BASE_CHAIN_ID) {
+            // send a call to base chain to burn the tokens
+            bytes memory _ccipData = abi.encode(CCIP_REQUEST_BURN_TOKENS, msg.sender, tokensToBurn, block.chainid, address(this), i_tokenId);
+            AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
+        }
     }
 
-    // @todo change for base chain and other chain in terms of required collateral
+    function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager {
+        require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
+        s_estateTokenOwnershipMintedForAnotherChain[_user][_sourceChainId] -= _tokensToBurn;
+        emit EstateOwnershipTokensBurnt(_user, _tokensToBurn);
+        _burn(_user, _tokensToBurn);
+    }
+
     function withdrawCollateral(uint256 collateralAmount) external {
         s_collateralDeposited[msg.sender] -= collateralAmount;
-        require(_hasEnoughCollateral(msg.sender), TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt());
+
+        if (block.chainid == BASE_CHAIN_ID) {
+            require(_hasEnoughCollateral(msg.sender), TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt());
+        }
+        else {
+            require(_hasEnoughCollateralForTokens(msg.sender, s_estateTokenOwnershipMinted[msg.sender] + s_pendingEstateTokenOwnershipToMint[msg.sender]), TokenizedRealEstate__NotEnoughCollateralToCoverEstateTokenDebt());
+        }
+
         IERC20(i_paymentToken).safeTransfer(msg.sender, collateralAmount);
     }
 
