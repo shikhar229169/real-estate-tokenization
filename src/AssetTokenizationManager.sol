@@ -362,7 +362,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
             address user, 
             uint256 tokensToBurn, 
             uint256 sourceChainId, 
-            address sourceTokenizedRealEstate, 
+            /* address sourceTokenizedRealEstate */, 
             uint256 tokenId
         ) = abi.decode(_data, (uint256, address, uint256, uint256, address, uint256));
         TokenizedRealEstate _tre = TokenizedRealEstate(s_tokenIdToChainIdToTokenizedRealEstate[tokenId][block.chainid]);

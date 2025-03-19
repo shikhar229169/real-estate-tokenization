@@ -36,6 +36,7 @@ interface IRealEstateRegistry {
     event EIP712DomainChanged();
     event OperatorVaultApproved(address approver, address operator);
     event OperatorVaultRegistered(address operator, address vault);
+    event OperatorVaultSlashed(string ensName, address operator);
     event RoleAdminChanged(bytes32 indexed role, bytes32 indexed previousAdminRole, bytes32 indexed newAdminRole);
     event RoleGranted(bytes32 indexed role, address indexed account, address indexed sender);
     event RoleRevoked(bytes32 indexed role, address indexed account, address indexed sender);
@@ -85,7 +86,7 @@ interface IRealEstateRegistry {
     function getSwapRouter() external view returns (address);
     function grantRole(bytes32 role, address account) external;
     function hasRole(bytes32 role, address account) external view returns (bool);
-    function prepareRegisterVaultHash(string memory _ensName) external view returns (bytes32);
+    function prepareRegisterVaultHash(address _operator, string memory _ensName) external view returns (bytes32);
     function renounceRole(bytes32 role, address callerConfirmation) external;
     function revokeRole(bytes32 role, address account) external;
     function setCollateralRequiredForOperator(uint256 _newOperatorCollateral) external;

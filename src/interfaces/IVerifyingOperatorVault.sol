@@ -43,6 +43,7 @@ interface IVerifyingOperatorVault {
     function UPGRADE_INTERFACE_VERSION() external view returns (string memory);
     function addNewTokenizedRealEstate(address _tokenizedRealEstate) external;
     function claimRewardFromStaking() external;
+    function getIsSlashed() external view returns (bool);
     function getPriceFromTokenToAnotherToken(address _tokenA, address _tokenB, uint256 _tokenAmountA)
         external
         view
@@ -60,6 +61,7 @@ interface IVerifyingOperatorVault {
     function revokeRole(bytes32 role, address account) external;
     function setMaxSlippage(uint256 _newSlippage) external;
     function setStakeDelay(uint256 _newStakeDelay) external;
+    function slashVault() external;
     function stakeCollateral(uint256 _amount) external;
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
     function toggleAutoUpdate() external;
@@ -67,5 +69,4 @@ interface IVerifyingOperatorVault {
     function upgradeToAndCall(address newImplementation, bytes memory data) external payable;
     function withdrawFromPending() external;
     function withdrawStake(uint256 _amount) external;
-    function slashVault() external;
 }
