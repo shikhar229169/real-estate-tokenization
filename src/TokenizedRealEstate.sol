@@ -196,7 +196,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
     }
 
-    function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager updateReward(msg.sender) {
+    function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager updateReward(_user) {
         require(block.chainid == BASE_CHAIN_ID, TokenizedRealEstate__NotOnBaseChain());
         s_estateTokenOwnershipMintedForAnotherChain[_user][_sourceChainId] -= _tokensToBurn;
         emit EstateOwnershipTokensBurnt(_user, _tokensToBurn);
