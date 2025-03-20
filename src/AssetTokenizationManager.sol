@@ -129,7 +129,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
     }
 
     // functions
-    
+
     // /**
     //  * @dev calls chainlink function to query for data from the off-chain registry
     //  * @notice one user can have only one tokenized real estate registered
@@ -240,7 +240,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
             bytes memory bridgeData = abi.encode(CCIP_DEPLOY_TOKENIZED_REAL_ESTATE, _request.estateOwnerAcrossChain[i], estateCost, percentageToTokenize, _tokenId, _salt, _paymentTokenOnChain, _request.chainsToDeploy, _deploymentAddrForOtherChains);
             uint256 _chainId = _request.chainsToDeploy[i];
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainId] = _deploymentAddrForOtherChains[i];
-            bridgeRequest(_chainId, bridgeData, 900_000);
+            bridgeRequest(_chainId, bridgeData, 26_00_000);
         }
     }
 
