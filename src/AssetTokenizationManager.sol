@@ -120,57 +120,58 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
         }
     }
 
-    function setRegistry(address _registry) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setRegistry(address _registry) external onlyOwner {
         s_registry = _registry;
     }
 
-    function setEstateVerificationSource(EstateVerificationFunctionsParams memory _params) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setEstateVerificationSource(EstateVerificationFunctionsParams memory _params) external onlyOwner {
         s_estateVerificationFunctionsParams = _params;
     }
 
     // functions
-    /**
-     * @dev calls chainlink function to query for data from the off-chain registry
-     * @notice one user can have only one tokenized real estate registered
-     * @param _paymentToken address of the token to be used for payment on the owner's real estate contract
-     */
-    function createTokenizedRealEstate(address _paymentToken, uint256[] memory chainsToDeploy, address[] memory _estateOwnerAcrossChain) external returns (bytes32) {
-        require(balanceOf(msg.sender) == 0, AssetTokenizationManager__OnlyOneTokenizedRealEstatePerUser());
-        require(block.chainid == i_baseChain, AssetTokenizationManager__ChainNotSupported());
-        require(chainsToDeploy[0] == block.chainid, AssetTokenizationManager__BaseChainRequired());
-        require(IRealEstateRegistry(s_registry).getDataFeedForToken(_paymentToken) != address(0), AssetTokenizationManager__TokenNotWhitelisted());
-        require(msg.sender == _estateOwnerAcrossChain[0], AssetTokenizationManager__NotAssetOwner());
-        for (uint256 i; i < chainsToDeploy.length; i++) {
-            if (i > 0) {
-                require(chainsToDeploy[i] != block.chainid, AssetTokenizationManager__ChainNotSupported());
-            }
-            require(s_isSupportedChain[chainsToDeploy[i]], AssetTokenizationManager__ChainNotSupported());
-        }
+    
+    // /**
+    //  * @dev calls chainlink function to query for data from the off-chain registry
+    //  * @notice one user can have only one tokenized real estate registered
+    //  * @param _paymentToken address of the token to be used for payment on the owner's real estate contract
+    //  */
+    // function createTokenizedRealEstate(address _paymentToken, uint256[] memory chainsToDeploy, address[] memory _estateOwnerAcrossChain) external returns (bytes32) {
+    //     require(balanceOf(msg.sender) == 0, AssetTokenizationManager__OnlyOneTokenizedRealEstatePerUser());
+    //     require(block.chainid == i_baseChain, AssetTokenizationManager__ChainNotSupported());
+    //     require(chainsToDeploy[0] == block.chainid, AssetTokenizationManager__BaseChainRequired());
+    //     require(IRealEstateRegistry(s_registry).getDataFeedForToken(_paymentToken) != address(0), AssetTokenizationManager__TokenNotWhitelisted());
+    //     require(msg.sender == _estateOwnerAcrossChain[0], AssetTokenizationManager__NotAssetOwner());
+    //     for (uint256 i; i < chainsToDeploy.length; i++) {
+    //         if (i > 0) {
+    //             require(chainsToDeploy[i] != block.chainid, AssetTokenizationManager__ChainNotSupported());
+    //         }
+    //         require(s_isSupportedChain[chainsToDeploy[i]], AssetTokenizationManager__ChainNotSupported());
+    //     }
         
-        FunctionsRequest.Request memory req;
-        string[] memory args = new string[](1);
-        args[0] = Strings.toHexString(msg.sender);
-        req.initializeRequestForInlineJavaScript(s_estateVerificationFunctionsParams.source);
-        req.addSecretsReference(s_estateVerificationFunctionsParams.encryptedSecretsUrls);
-        req.setArgs(args);
+    //     FunctionsRequest.Request memory req;
+    //     string[] memory args = new string[](1);
+    //     args[0] = Strings.toHexString(msg.sender);
+    //     req.initializeRequestForInlineJavaScript(s_estateVerificationFunctionsParams.source);
+    //     req.addSecretsReference(s_estateVerificationFunctionsParams.encryptedSecretsUrls);
+    //     req.setArgs(args);
 
-        bytes32 reqId = _sendRequest(
-            req.encodeCBOR(),
-            s_estateVerificationFunctionsParams.subId,
-            s_estateVerificationFunctionsParams.gasLimit,
-            s_estateVerificationFunctionsParams.donId
-        );
+    //     bytes32 reqId = _sendRequest(
+    //         req.encodeCBOR(),
+    //         s_estateVerificationFunctionsParams.subId,
+    //         s_estateVerificationFunctionsParams.gasLimit,
+    //         s_estateVerificationFunctionsParams.donId
+    //     );
 
-        emit TokenizationRequestPlaced(reqId, msg.sender);
-        s_reqIdToTokenizeFunctionCallRequest[reqId] = TokenizeFunctionCallRequest({
-            estateOwner: msg.sender,
-            chainsToDeploy: chainsToDeploy,
-            paymentToken: _paymentToken,
-            estateOwnerAcrossChain: _estateOwnerAcrossChain
-        });
+    //     emit TokenizationRequestPlaced(reqId, msg.sender);
+    //     s_reqIdToTokenizeFunctionCallRequest[reqId] = TokenizeFunctionCallRequest({
+    //         estateOwner: msg.sender,
+    //         chainsToDeploy: chainsToDeploy,
+    //         paymentToken: _paymentToken,
+    //         estateOwnerAcrossChain: _estateOwnerAcrossChain
+    //     });
 
-        return reqId;
-    }
+    //     return reqId;
+    // }
 
     function bridgeRequestFromTRE(bytes memory _data, uint256 _gasLimit, uint256 _destChainId, uint256 _tokenId) external {
         address tokenizedRealEstate = s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate;
@@ -262,9 +263,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, FunctionsClient,
         IERC20(_paymentToken).safeTransferFrom(_estateOwner, address(this), collateralAmount);
     }
 
-    function handleTestCrossChainMessage(bytes32 _messageId, bytes memory _data) external {
-        _handleCrossChainMessage(_messageId, _data);
-    }
+    // function handleTestCrossChainMessage(bytes32 _messageId, bytes memory _data) external {
+    //     _handleCrossChainMessage(_messageId, _data);
+    // }
 
     function _handleCrossChainMessage(bytes32 /*_messageId*/, bytes memory _data) internal override {
         uint256 ccipRequestType;

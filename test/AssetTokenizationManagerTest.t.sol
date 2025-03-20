@@ -104,9 +104,6 @@ contract AssetTokenizationManagerTest is Test {
         vm.prank(owner);
         assetTokenizationManager.allowlistManager(14767482510784806043, tokenizationManagerSource);
 
-        vm.prank(owner);
-        assetTokenizationManager.switchPhase();
-
         vm.prank(router);
         assetTokenizationManager.ccipReceive(any2EvmMessage);
 
@@ -250,29 +247,29 @@ contract AssetTokenizationManagerTest is Test {
     //     }
     // }
 
-    function test_createTokenizedRealEstate_IsBaseChainRequired() public {
-        uint256[] memory _chainsToDeploy = new uint256[](2);
+    // function test_createTokenizedRealEstate_IsBaseChainRequired() public {
+    //     uint256[] memory _chainsToDeploy = new uint256[](2);
 
-        address[] memory _estateOwnerAcrossChain = new address[](2);
+    //     address[] memory _estateOwnerAcrossChain = new address[](2);
 
-        vm.startPrank(user);
-        vm.expectRevert(AssetTokenizationManager__BaseChainRequired.selector);
-        assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
-        vm.stopPrank();
-    }
+    //     vm.startPrank(user);
+    //     vm.expectRevert(AssetTokenizationManager__BaseChainRequired.selector);
+    //     assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
+    //     vm.stopPrank();
+    // }
 
-    function test_createTokenizedRealEstate() public {
-        uint256[] memory _chainsToDeploy = new uint256[](2);
-        _chainsToDeploy[0] = networkConfig.supportedChains[0];
-        _chainsToDeploy[1] = networkConfig.supportedChains[1];
+    // function test_createTokenizedRealEstate() public {
+    //     uint256[] memory _chainsToDeploy = new uint256[](2);
+    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
+    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-        address[] memory _estateOwnerAcrossChain = new address[](2);
+    //     address[] memory _estateOwnerAcrossChain = new address[](2);
 
-        vm.startPrank(user);
-        vm.expectRevert();
-        assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
-        vm.stopPrank();
-    }
+    //     vm.startPrank(user);
+    //     vm.expectRevert();
+    //     assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
+    //     vm.stopPrank();
+    // }
 
     function test_setRegistryIsNotCallableFroUsers() public {
         vm.startPrank(user);
@@ -314,41 +311,41 @@ contract AssetTokenizationManagerTest is Test {
         vm.stopPrank();
     }
 
-    function test_createTokenizedRealEstateRegistryIfTokenNotWhitelisted() public {
-        uint256[] memory _chainsToDeploy = new uint256[](2);
-        _chainsToDeploy[0] = networkConfig.supportedChains[0];
-        _chainsToDeploy[1] = networkConfig.supportedChains[1];
+    // function test_createTokenizedRealEstateRegistryIfTokenNotWhitelisted() public {
+    //     uint256[] memory _chainsToDeploy = new uint256[](2);
+    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
+    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-        address[] memory _estateOwnerAcrossChain = new address[](2);
+    //     address[] memory _estateOwnerAcrossChain = new address[](2);
         
-        vm.startPrank(owner);
-        assetTokenizationManager.setRegistry(address(realEstateRegistry));
-        vm.stopPrank();
+    //     vm.startPrank(owner);
+    //     assetTokenizationManager.setRegistry(address(realEstateRegistry));
+    //     vm.stopPrank();
 
-        address paymentToken = makeAddr("paymentToken");
-        vm.expectRevert(AssetTokenizationManager__TokenNotWhitelisted.selector);
-        vm.startPrank(address(user));
-        assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
-        vm.stopPrank();
-    }
+    //     address paymentToken = makeAddr("paymentToken");
+    //     vm.expectRevert(AssetTokenizationManager__TokenNotWhitelisted.selector);
+    //     vm.startPrank(address(user));
+    //     assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
+    //     vm.stopPrank();
+    // }
 
-    function test_createTokenizedRealEstateRegistryNotAssetOwner() public {
-        uint256[] memory _chainsToDeploy = new uint256[](2);
-        _chainsToDeploy[0] = networkConfig.supportedChains[0];
-        _chainsToDeploy[1] = networkConfig.supportedChains[1];
+    // function test_createTokenizedRealEstateRegistryNotAssetOwner() public {
+    //     uint256[] memory _chainsToDeploy = new uint256[](2);
+    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
+    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-        address[] memory _estateOwnerAcrossChain = new address[](2);
+    //     address[] memory _estateOwnerAcrossChain = new address[](2);
         
-        vm.startPrank(owner);
-        assetTokenizationManager.setRegistry(address(realEstateRegistry));
-        vm.stopPrank();
+    //     vm.startPrank(owner);
+    //     assetTokenizationManager.setRegistry(address(realEstateRegistry));
+    //     vm.stopPrank();
 
-        address paymentToken = networkConfig.link;
-        vm.startPrank(address(user));
-        vm.expectRevert(AssetTokenizationManager__NotAssetOwner.selector);
-        assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
-        vm.stopPrank();
-    }
+    //     address paymentToken = networkConfig.link;
+    //     vm.startPrank(address(user));
+    //     vm.expectRevert(AssetTokenizationManager__NotAssetOwner.selector);
+    //     assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
+    //     vm.stopPrank();
+    // }
 
     // function test_createTokenizedRealEstate_RegistryYOYO() public {
     //     uint256[] memory _chainsToDeploy = new uint256[](2);
@@ -490,10 +487,10 @@ contract AssetTokenizationManagerTest is Test {
         vm.stopPrank();
     }
 
-    function test_handleCrossChainMessage() public {
-        bytes memory _data = hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f1c8170181364ded1c56c4361ded2eb47f2eef1b00000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000136390000000000000000000000000000000000000000000000000000000000000000000000000000000000001c6db13f57da5eaac72e591adcc96bc76d987623000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000006fe732c2eef2eeeec64e2216205b1efa1a8f83d8000000000000000000000000a10a8420a99eb2002058ad45e134df03208e6a02";
-        assetTokenizationManager.handleTestCrossChainMessage(bytes32(0), _data);
-    }
+    // function test_handleCrossChainMessage() public {
+    //     bytes memory _data = hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f1c8170181364ded1c56c4361ded2eb47f2eef1b00000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000136390000000000000000000000000000000000000000000000000000000000000000000000000000000000001c6db13f57da5eaac72e591adcc96bc76d987623000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000006fe732c2eef2eeeec64e2216205b1efa1a8f83d8000000000000000000000000a10a8420a99eb2002058ad45e134df03208e6a02";
+    //     assetTokenizationManager.handleTestCrossChainMessage(bytes32(0), _data);
+    // }
 
     function test_crossChainDecoding() public pure {
         bytes memory _data = hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000f1c8170181364ded1c56c4361ded2eb47f2eef1b00000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000136390000000000000000000000000000000000000000000000000000000000000000000000000000000000001c6db13f57da5eaac72e591adcc96bc76d987623000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000006fe732c2eef2eeeec64e2216205b1efa1a8f83d8000000000000000000000000a10a8420a99eb2002058ad45e134df03208e6a02";

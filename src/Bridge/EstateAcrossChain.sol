@@ -4,13 +4,12 @@ pragma solidity 0.8.28;
 
 import {IRouterClient} from "@chainlink/contracts-ccip/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {OwnerIsCreator} from "@chainlink/contracts-ccip/src/v0.8/shared/access/OwnerIsCreator.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
 import {CCIPReceiver} from "@chainlink/contracts-ccip/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@chainlink/contracts-ccip/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/utils/SafeERC20.sol";
 
-abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessControl {
+abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator {
     using SafeERC20 for IERC20;
 
     error NotEnoughBalance(uint256 currentBalance, uint256 calculatedFees); 
@@ -39,8 +38,6 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
 
     bytes32 private s_lastReceivedMessageId; 
     bytes private s_lastReceivedData;
-    bool public testPhase;
-    bool public result = false;
 
     mapping(uint256 => uint64) public chainIdToSelector;
     mapping(uint64 => address) public chainSelectorToManager;
@@ -52,24 +49,18 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     /// @param _link The address of the link contract.
     constructor(address _router, address _link, uint256[] memory _chainId, uint64[] memory _chainSelector) CCIPReceiver(_router) {
         s_linkToken = IERC20(_link);
-        testPhase = true;
 
         for (uint256 i = 0; i < _chainId.length; i++) {
             chainIdToSelector[_chainId[i]] = _chainSelector[i];
         }
-
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
     /// @dev Modifier that checks if the chain with the given sourceChainSelector is allowlisted and if the sender is allowlisted.
     /// @param _sourceChainSelector The selector of the source chain.
     /// @param _sender The address of the sender.
     modifier onlyAllowlisted(uint64 _sourceChainSelector, address _sender) {
-        if (chainSelectorToManager[_sourceChainSelector] != _sender && !testPhase) {
+        if (chainSelectorToManager[_sourceChainSelector] != _sender) {
             revert SenderNotAllowlisted(_sender);
-        }
-        else {
-            result = (chainSelectorToManager[_sourceChainSelector] == _sender);
         }
         _;
     }
@@ -79,10 +70,6 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
     modifier validateReceiver(address _receiver) {
         if (_receiver == address(0)) revert InvalidReceiverAddress();
         _;
-    }
-
-    function switchPhase() external onlyOwner {
-        testPhase = !testPhase;
     }
 
     /// @dev Updates the allowlist status of a sender for transactions.
@@ -163,10 +150,6 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         s_lastReceivedMessageId = any2EvmMessage.messageId; // fetch the messageId
         s_lastReceivedData = any2EvmMessage.data; // fetch the data
 
-        if (testPhase) {
-            return;
-        }
-
         _handleCrossChainMessage(s_lastReceivedMessageId, s_lastReceivedData);
 
         emit MessageReceived(
@@ -205,39 +188,43 @@ abstract contract EstateAcrossChain is CCIPReceiver, OwnerIsCreator, AccessContr
         });
     }
 
-    /// @notice Fetches the details of the last received message.
-    /// @return messageId The ID of the last received message.
-    /// @return data The last received text.
-    function getLastReceivedMessageDetails()
-        external
-        view
-        returns (bytes32 messageId, bytes memory data)
-    {
-        return (s_lastReceivedMessageId, s_lastReceivedData);
+    function getLastMessage() external view returns (bytes memory data) {
+        return s_lastReceivedData;
     }
 
-    /// @notice Allows the owner of the contract to withdraw all tokens of a specific ERC20 token.
-    /// @dev This function reverts with a 'NothingToWithdraw' error if there are no tokens to withdraw.
-    /// @param _beneficiary The address to which the tokens will be sent.
-    /// @param _token The contract address of the ERC20 token to be withdrawn.
-    function withdrawToken(
-        address _beneficiary,
-        address _token
-    ) public onlyOwner {
-        // Retrieve the balance of this contract
-        uint256 amount = IERC20(_token).balanceOf(address(this));
+    // /// @notice Fetches the details of the last received message.
+    // /// @return messageId The ID of the last received message.
+    // /// @return data The last received text.
+    // function getLastReceivedMessageDetails()
+    //     external
+    //     view
+    //     returns (bytes32 messageId, bytes memory data)
+    // {
+    //     return (s_lastReceivedMessageId, s_lastReceivedData);
+    // }
 
-        // Revert if there is nothing to withdraw
-        if (amount == 0) revert NothingToWithdraw();
+    // /// @notice Allows the owner of the contract to withdraw all tokens of a specific ERC20 token.
+    // /// @dev This function reverts with a 'NothingToWithdraw' error if there are no tokens to withdraw.
+    // /// @param _beneficiary The address to which the tokens will be sent.
+    // /// @param _token The contract address of the ERC20 token to be withdrawn.
+    // function withdrawToken(
+    //     address _beneficiary,
+    //     address _token
+    // ) public onlyOwner {
+    //     // Retrieve the balance of this contract
+    //     uint256 amount = IERC20(_token).balanceOf(address(this));
 
-        IERC20(_token).safeTransfer(_beneficiary, amount);
-    }
+    //     // Revert if there is nothing to withdraw
+    //     if (amount == 0) revert NothingToWithdraw();
 
-    function getLinkToken() public view returns (IERC20) {
-        return s_linkToken;
-    }
+    //     IERC20(_token).safeTransfer(_beneficiary, amount);
+    // }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(CCIPReceiver, AccessControl) returns (bool) {
-        return CCIPReceiver.supportsInterface(interfaceId) || AccessControl.supportsInterface(interfaceId);
+    // function getLinkToken() public view returns (IERC20) {
+    //     return s_linkToken;
+    // }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
+        return CCIPReceiver.supportsInterface(interfaceId);
     }
 }
