@@ -13,6 +13,7 @@ import {MockERC20} from "../test/mocks/MockERC20Token.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {USDC} from "../test/mocks/MockUSDCToken.sol";
 import {Client} from "@chainlink/contracts-ccip/src/v0.8/ccip/libraries/Client.sol";
+import {EstateVerification} from "../src/Computation/EstateVerification.sol";
 
 contract AssetTokenizationManagerTest is Test {
     error AssetTokenizationManager__BaseChainRequired();
@@ -21,6 +22,9 @@ contract AssetTokenizationManagerTest is Test {
     error RealEstateRegistry__InvalidToken();
     error RealEstateRegistry__InvalidCollateral();
     error RealEstateRegistry__InvalidENSName();
+    error EstateVerification__TokenNotWhitelisted();
+    error EstateVerification__NotAssetOwner();
+    error EstateVerification__BaseChainRequired();
 
     TokenizedRealEstate public tokenizedRealEstate;
     address public user;
@@ -38,6 +42,7 @@ contract AssetTokenizationManagerTest is Test {
     DeployAssetTokenizationManager public deployer;
     RealEstateRegistry public realEstateRegistry;
     VerifyingOperatorVault public verifyingOperatorVault;
+    EstateVerification public estateVerification;
 
     function setUp() public {
         (owner, ownerKey) = makeAddrAndKey("owner");
@@ -47,7 +52,7 @@ contract AssetTokenizationManagerTest is Test {
         mockToken = new MockERC20();
 
         deployer = new DeployAssetTokenizationManager();
-        (assetTokenizationManager, verifyingOperatorVault, realEstateRegistry, usdc,  helperConfig) = deployer.deploy(owner, ownerKey);
+        (assetTokenizationManager, verifyingOperatorVault, realEstateRegistry, usdc, estateVerification,helperConfig) = deployer.deploy(owner, ownerKey);
         networkConfig = helperConfig.getNetworkConfig();
 
         address[] memory _acceptedTokens = new address[](1);
@@ -154,122 +159,122 @@ contract AssetTokenizationManagerTest is Test {
         console.log(info.estateCost, "percentageToTokenize");
     }
 
-    function test_ccipReceiveWithDataFork_2() public {
-        address router = networkConfig.ccipRouter;
+    // function test_ccipReceiveWithDataFork_2() public {
+    //     address router = networkConfig.ccipRouter;
 
-        address tokenizationManagerSource = 0xdc5E2b74FbC0b4a8C7F6944D936f3f8eE8f9b5B2;
-        AssetTokenizationManager currATM = AssetTokenizationManager(0xbd1d59757BDF0b4896E6d8D32E34a4A3417973f7);
+    //     address tokenizationManagerSource = 0xdc5E2b74FbC0b4a8C7F6944D936f3f8eE8f9b5B2;
+    //     AssetTokenizationManager currATM = AssetTokenizationManager(0xbd1d59757BDF0b4896E6d8D32E34a4A3417973f7);
 
-        uint256 MESSAGE_TYPE = 1;
-        address estateOwner = nodeOperator;
-        uint256 estateCost = 1000000e18;
-        uint256 percentageToTokenize = 100e18;
-        uint256 tokenId = 2;
-        bytes32 salt = bytes32(abi.encode(70));
-        address paymentToken = address(usdc);
-        uint256[] memory chainsToDeploy = new uint256[](2);
-        chainsToDeploy[0] = networkConfig.supportedChains[0];
-        chainsToDeploy[1] = networkConfig.supportedChains[1];
-        address[] memory deploymentAddrForOtherChains = new address[](2);
-        deploymentAddrForOtherChains[0] = makeAddr("deploymentAddrForOtherChains0");
-        deploymentAddrForOtherChains[1] = makeAddr("deploymentAddrForOtherChains1");
+    //     uint256 MESSAGE_TYPE = 1;
+    //     address estateOwner = nodeOperator;
+    //     uint256 estateCost = 1000000e18;
+    //     uint256 percentageToTokenize = 100e18;
+    //     uint256 tokenId = 2;
+    //     bytes32 salt = bytes32(abi.encode(70));
+    //     address paymentToken = address(usdc);
+    //     uint256[] memory chainsToDeploy = new uint256[](2);
+    //     chainsToDeploy[0] = networkConfig.supportedChains[0];
+    //     chainsToDeploy[1] = networkConfig.supportedChains[1];
+    //     address[] memory deploymentAddrForOtherChains = new address[](2);
+    //     deploymentAddrForOtherChains[0] = makeAddr("deploymentAddrForOtherChains0");
+    //     deploymentAddrForOtherChains[1] = makeAddr("deploymentAddrForOtherChains1");
 
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: bytes32(abi.encode(69)),
-            sourceChainSelector: 14767482510784806043, // 43113
-            sender: abi.encode(tokenizationManagerSource),
-            data: abi.encode(MESSAGE_TYPE, estateOwner, estateCost, percentageToTokenize, tokenId, salt, paymentToken, chainsToDeploy, deploymentAddrForOtherChains),
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
-        });
+    //     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+    //         messageId: bytes32(abi.encode(69)),
+    //         sourceChainSelector: 14767482510784806043, // 43113
+    //         sender: abi.encode(tokenizationManagerSource),
+    //         data: abi.encode(MESSAGE_TYPE, estateOwner, estateCost, percentageToTokenize, tokenId, salt, paymentToken, chainsToDeploy, deploymentAddrForOtherChains),
+    //         destTokenAmounts: new Client.EVMTokenAmount[](0)
+    //     });
 
-        console.log("Total Supply:", currATM.balanceOf(estateOwner));
+    //     console.log("Total Supply:", currATM.balanceOf(estateOwner));
 
-        vm.prank(router);
-        currATM.ccipReceive(any2EvmMessage);
+    //     vm.prank(router);
+    //     currATM.ccipReceive(any2EvmMessage);
 
-        // AssetTokenizationManager.EstateInfo memory info = currATM.getEstateInfo(2);
-        console.log("Total Supply:", currATM.balanceOf(estateOwner));
-        console.log("Owner:", currATM.ownerOf(tokenId));
-        // console.log(info.estateOwner, "estateOwner");
-        // console.log(info.percentageToTokenize, "percentageToTokenize");
-        // console.log(info.tokenizedRealEstate, "percentageToTokenize");
-        // console.log(info.estateCost, "percentageToTokenize");
+    //     // AssetTokenizationManager.EstateInfo memory info = currATM.getEstateInfo(2);
+    //     console.log("Total Supply:", currATM.balanceOf(estateOwner));
+    //     console.log("Owner:", currATM.ownerOf(tokenId));
+    //     // console.log(info.estateOwner, "estateOwner");
+    //     // console.log(info.percentageToTokenize, "percentageToTokenize");
+    //     // console.log(info.tokenizedRealEstate, "percentageToTokenize");
+    //     // console.log(info.estateCost, "percentageToTokenize");
+    // }
+
+
+    // function test_ccipReceiveWithDataFork_Curr() public {
+    //     address router = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
+
+    //     address tokenizationManagerSource = 0x51002D2d366779b4C2CEDf817c47fB4eFfa928CE;
+    //     AssetTokenizationManager currATM = AssetTokenizationManager(0xE3311eb12426c4e19f4a655330a5d47973815b1A);
+
+    //     address estateOwner = 0x697F5E7a089e1621EA329FE4e906EA45D16E79c6;
+    //     // uint256 MESSAGE_TYPE = 1;
+    //     // uint256 estateCost = 1000;
+    //     // uint256 percentageToTokenize = 100e18;
+    //     uint256 tokenId = 1;
+    //     // bytes32 salt = bytes32(bytes("7000"));
+    //     // address paymentToken = address(usdc);
+    //     // uint256[] memory chainsToDeploy = new uint256[](2);
+    //     // chainsToDeploy[0] = networkConfig.supportedChains[0];
+    //     // chainsToDeploy[1] = networkConfig.supportedChains[1];
+    //     // address[] memory deploymentAddrForOtherChains = new address[](2);
+    //     // deploymentAddrForOtherChains[0] = makeAddr("deploymentAddrForOtherChains0");
+    //     // deploymentAddrForOtherChains[1] = makeAddr("deploymentAddrForOtherChains1");
+
+    //     Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
+    //         messageId: 0xfc34e0b36b57a9930766c2b8237ec43af2d0f30de225036a37da0fcb87039c57,
+    //         sourceChainSelector: 14767482510784806043, // 43113
+    //         sender: abi.encode(tokenizationManagerSource),
+    //         data: hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000697f5e7a089e1621ea329fe4e906ea45d16e79c600000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000137303030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000003b9c38ddbe817335c8aea40204938ab42186c969000000000000000000000000de482fd8265dbad60dd5c0761ab8ccc848a71699",
+    //         destTokenAmounts: new Client.EVMTokenAmount[](0)
+    //     });
+
+    //     console.log("Total Supply:", currATM.balanceOf(estateOwner));
+
+    //     vm.prank(router);
+    //     currATM.ccipReceive(any2EvmMessage);
+
+    //     // AssetTokenizationManager.EstateInfo memory info = currATM.getEstateInfo(2);
+    //     console.log("Total Supply:", currATM.balanceOf(estateOwner));
+    //     console.log("Owner:", currATM.ownerOf(tokenId));
+    //     // console.log(info.estateOwner, "estateOwner");
+    //     // console.log(info.percentageToTokenize, "percentageToTokenize");
+    //     // console.log(info.tokenizedRealEstate, "percentageToTokenize");
+    //     // console.log(info.estateCost, "percentageToTokenize");
+    // }
+
+    function test_ConstructorAssetTokenizationManager() public view {
+        assertEq(assetTokenizationManager.getBaseChain(), networkConfig.baseChainId);
+        uint256[] memory supportedChains = assetTokenizationManager.getSupportedChains();
+        for (uint256 i = 0; i < supportedChains.length; i++) {
+            assertEq(supportedChains[i], networkConfig.supportedChains[i]);
+        }
     }
 
+    function test_createTokenizedRealEstate_IsBaseChainRequired() public {
+        uint256[] memory _chainsToDeploy = new uint256[](2);
 
-    function test_ccipReceiveWithDataFork_Curr() public {
-        address router = 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59;
+        address[] memory _estateOwnerAcrossChain = new address[](2);
 
-        address tokenizationManagerSource = 0x51002D2d366779b4C2CEDf817c47fB4eFfa928CE;
-        AssetTokenizationManager currATM = AssetTokenizationManager(0xE3311eb12426c4e19f4a655330a5d47973815b1A);
-
-        address estateOwner = 0x697F5E7a089e1621EA329FE4e906EA45D16E79c6;
-        // uint256 MESSAGE_TYPE = 1;
-        // uint256 estateCost = 1000;
-        // uint256 percentageToTokenize = 100e18;
-        uint256 tokenId = 1;
-        // bytes32 salt = bytes32(bytes("7000"));
-        // address paymentToken = address(usdc);
-        // uint256[] memory chainsToDeploy = new uint256[](2);
-        // chainsToDeploy[0] = networkConfig.supportedChains[0];
-        // chainsToDeploy[1] = networkConfig.supportedChains[1];
-        // address[] memory deploymentAddrForOtherChains = new address[](2);
-        // deploymentAddrForOtherChains[0] = makeAddr("deploymentAddrForOtherChains0");
-        // deploymentAddrForOtherChains[1] = makeAddr("deploymentAddrForOtherChains1");
-
-        Client.Any2EVMMessage memory any2EvmMessage = Client.Any2EVMMessage({
-            messageId: 0xfc34e0b36b57a9930766c2b8237ec43af2d0f30de225036a37da0fcb87039c57,
-            sourceChainSelector: 14767482510784806043, // 43113
-            sender: abi.encode(tokenizationManagerSource),
-            data: hex"0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000697f5e7a089e1621ea329fe4e906ea45d16e79c600000000000000000000000000000000000000000000000000000000000003e80000000000000000000000000000000000000000000000056bc75e2d63100000000000000000000000000000000000000000000000000000000000000000000137303030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000a8690000000000000000000000000000000000000000000000000000000000aa36a700000000000000000000000000000000000000000000000000000000000000020000000000000000000000003b9c38ddbe817335c8aea40204938ab42186c969000000000000000000000000de482fd8265dbad60dd5c0761ab8ccc848a71699",
-            destTokenAmounts: new Client.EVMTokenAmount[](0)
-        });
-
-        console.log("Total Supply:", currATM.balanceOf(estateOwner));
-
-        vm.prank(router);
-        currATM.ccipReceive(any2EvmMessage);
-
-        // AssetTokenizationManager.EstateInfo memory info = currATM.getEstateInfo(2);
-        console.log("Total Supply:", currATM.balanceOf(estateOwner));
-        console.log("Owner:", currATM.ownerOf(tokenId));
-        // console.log(info.estateOwner, "estateOwner");
-        // console.log(info.percentageToTokenize, "percentageToTokenize");
-        // console.log(info.tokenizedRealEstate, "percentageToTokenize");
-        // console.log(info.estateCost, "percentageToTokenize");
+        vm.startPrank(user);
+        vm.expectRevert(EstateVerification__BaseChainRequired.selector);
+        estateVerification.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
+        vm.stopPrank();
     }
 
-    // function test_ConstructorAssetTokenizationManager() public view {
-    //     assertEq(assetTokenizationManager.getBaseChain(), networkConfig.baseChainId);
-    //     uint256[] memory supportedChains = assetTokenizationManager.getSupportedChains();
-    //     for (uint256 i = 0; i < supportedChains.length; i++) {
-    //         assertEq(supportedChains[i], networkConfig.supportedChains[i]);
-    //     }
-    // }
+    function test_createTokenizedRealEstate() public {
+        uint256[] memory _chainsToDeploy = new uint256[](2);
+        _chainsToDeploy[0] = networkConfig.supportedChains[0];
+        _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-    // function test_createTokenizedRealEstate_IsBaseChainRequired() public {
-    //     uint256[] memory _chainsToDeploy = new uint256[](2);
+        address[] memory _estateOwnerAcrossChain = new address[](2);
 
-    //     address[] memory _estateOwnerAcrossChain = new address[](2);
-
-    //     vm.startPrank(user);
-    //     vm.expectRevert(AssetTokenizationManager__BaseChainRequired.selector);
-    //     assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
-    //     vm.stopPrank();
-    // }
-
-    // function test_createTokenizedRealEstate() public {
-    //     uint256[] memory _chainsToDeploy = new uint256[](2);
-    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
-    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
-
-    //     address[] memory _estateOwnerAcrossChain = new address[](2);
-
-    //     vm.startPrank(user);
-    //     vm.expectRevert();
-    //     assetTokenizationManager.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
-    //     vm.stopPrank();
-    // }
+        vm.startPrank(user);
+        vm.expectRevert();
+        estateVerification.createTokenizedRealEstate(networkConfig.link, _chainsToDeploy, _estateOwnerAcrossChain);
+        vm.stopPrank();
+    }
 
     function test_setRegistryIsNotCallableFroUsers() public {
         vm.startPrank(user);
@@ -279,7 +284,7 @@ contract AssetTokenizationManagerTest is Test {
     }
 
     function test_setEstateVerificationSourceIsNotCallableFroUsers() public {
-        AssetTokenizationManager.EstateVerificationFunctionsParams memory _params;
+        EstateVerification.EstateVerificationFunctionsParams memory _params;
         _params.source = "source";
         _params.encryptedSecretsUrls = "encryptedSecretsUrls";
         _params.subId = 1;
@@ -288,12 +293,12 @@ contract AssetTokenizationManagerTest is Test {
 
         vm.startPrank(user);
         vm.expectRevert();
-        assetTokenizationManager.setEstateVerificationSource(_params);
+        estateVerification.setEstateVerificationSource(_params);
         vm.stopPrank();
     }
 
     function test_setEstateVerificationSource() public {
-        AssetTokenizationManager.EstateVerificationFunctionsParams memory _params;
+        EstateVerification.EstateVerificationFunctionsParams memory _params;
         _params.source = "source";
         _params.encryptedSecretsUrls = "encryptedSecretsUrls";
         _params.subId = 1;
@@ -301,7 +306,7 @@ contract AssetTokenizationManagerTest is Test {
         _params.donId = "0x1";
 
         vm.startPrank(address(owner));
-        assetTokenizationManager.setEstateVerificationSource(_params);
+        estateVerification.setEstateVerificationSource(_params);
         vm.stopPrank();
     }
 
@@ -311,41 +316,41 @@ contract AssetTokenizationManagerTest is Test {
         vm.stopPrank();
     }
 
-    // function test_createTokenizedRealEstateRegistryIfTokenNotWhitelisted() public {
-    //     uint256[] memory _chainsToDeploy = new uint256[](2);
-    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
-    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
+    function test_createTokenizedRealEstateRegistryIfTokenNotWhitelisted() public {
+        uint256[] memory _chainsToDeploy = new uint256[](2);
+        _chainsToDeploy[0] = networkConfig.supportedChains[0];
+        _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-    //     address[] memory _estateOwnerAcrossChain = new address[](2);
+        address[] memory _estateOwnerAcrossChain = new address[](2);
         
-    //     vm.startPrank(owner);
-    //     assetTokenizationManager.setRegistry(address(realEstateRegistry));
-    //     vm.stopPrank();
+        vm.startPrank(owner);
+        assetTokenizationManager.setRegistry(address(realEstateRegistry));
+        vm.stopPrank();
 
-    //     address paymentToken = makeAddr("paymentToken");
-    //     vm.expectRevert(AssetTokenizationManager__TokenNotWhitelisted.selector);
-    //     vm.startPrank(address(user));
-    //     assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
-    //     vm.stopPrank();
-    // }
+        address paymentToken = makeAddr("paymentToken");
+        vm.expectRevert(EstateVerification__TokenNotWhitelisted.selector);
+        vm.startPrank(address(user));
+        estateVerification.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
+        vm.stopPrank();
+    }
 
-    // function test_createTokenizedRealEstateRegistryNotAssetOwner() public {
-    //     uint256[] memory _chainsToDeploy = new uint256[](2);
-    //     _chainsToDeploy[0] = networkConfig.supportedChains[0];
-    //     _chainsToDeploy[1] = networkConfig.supportedChains[1];
+    function test_createTokenizedRealEstateRegistryNotAssetOwner() public {
+        uint256[] memory _chainsToDeploy = new uint256[](2);
+        _chainsToDeploy[0] = networkConfig.supportedChains[0];
+        _chainsToDeploy[1] = networkConfig.supportedChains[1];
 
-    //     address[] memory _estateOwnerAcrossChain = new address[](2);
+        address[] memory _estateOwnerAcrossChain = new address[](2);
         
-    //     vm.startPrank(owner);
-    //     assetTokenizationManager.setRegistry(address(realEstateRegistry));
-    //     vm.stopPrank();
+        vm.startPrank(owner);
+        assetTokenizationManager.setRegistry(address(realEstateRegistry));
+        vm.stopPrank();
 
-    //     address paymentToken = networkConfig.link;
-    //     vm.startPrank(address(user));
-    //     vm.expectRevert(AssetTokenizationManager__NotAssetOwner.selector);
-    //     assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
-    //     vm.stopPrank();
-    // }
+        address paymentToken = networkConfig.link;
+        vm.startPrank(address(user));
+        vm.expectRevert(EstateVerification__NotAssetOwner.selector);
+        estateVerification.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
+        vm.stopPrank();
+    }
 
     // function test_createTokenizedRealEstate_RegistryYOYO() public {
     //     uint256[] memory _chainsToDeploy = new uint256[](2);
@@ -363,7 +368,7 @@ contract AssetTokenizationManagerTest is Test {
 
     //     address paymentToken = networkConfig.link;
     //     vm.startPrank(address(user));
-    //     assetTokenizationManager.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
+    //     estateVerification.createTokenizedRealEstate(paymentToken, _chainsToDeploy, _estateOwnerAcrossChain);
     //     vm.stopPrank();
     // }
 

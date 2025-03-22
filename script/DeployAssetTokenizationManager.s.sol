@@ -10,6 +10,7 @@ import {HelperConfig} from "./HelperConfig.s.sol";
 import {VerifyingOperatorVault} from "../src/VerifyingOperatorVault.sol";
 import {RealEstateRegistry} from "../src/RealEstateRegistry.sol";
 import {USDC} from "../test/mocks/MockUSDCToken.sol";
+import{EstateVerification} from "../src/Computation/EstateVerification.sol";
 
 contract DeployAssetTokenizationManager is Script {
 
@@ -20,7 +21,7 @@ contract DeployAssetTokenizationManager is Script {
         // deploy(owner, privateKey);
     }
 
-    function deploy(address owner, uint256 ownerKey) public returns (AssetTokenizationManager, VerifyingOperatorVault, RealEstateRegistry, USDC, HelperConfig) {
+    function deploy(address owner, uint256 ownerKey) public returns (AssetTokenizationManager, VerifyingOperatorVault, RealEstateRegistry, USDC, EstateVerification,HelperConfig) {
         HelperConfig helperConfig = new HelperConfig();
         helperConfig.run();
         HelperConfig.NetworkConfig memory networkConfig = helperConfig.getNetworkConfig();
@@ -43,6 +44,8 @@ contract DeployAssetTokenizationManager is Script {
             networkConfig.gasLimit,
             networkConfig.donId
         );
+        
+        EstateVerification estateVerification = EstateVerification(assetTokenizationManager.getEstateVerification());
 
         VerifyingOperatorVault verifyingOperatorVault = new VerifyingOperatorVault();
 
@@ -80,8 +83,9 @@ contract DeployAssetTokenizationManager is Script {
         console.log("VerifyingOperatorVault deployed at: ", address(verifyingOperatorVault));
         console.log("RealEstateRegistry deployed at: ", address(realEstateRegistry));
         console.log("USDC deployed at: ", address(usdc));
+        console.log("EstateVerification deployed at: ", address(estateVerification));
         console.log("HelperConfig deployed at: ", address(helperConfig));
 
-        return (assetTokenizationManager, verifyingOperatorVault, realEstateRegistry, usdc, helperConfig);
+        return (assetTokenizationManager, verifyingOperatorVault, realEstateRegistry, usdc, estateVerification,helperConfig);
     }
 }
