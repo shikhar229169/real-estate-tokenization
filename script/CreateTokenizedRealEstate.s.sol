@@ -5,21 +5,24 @@ pragma solidity 0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {AssetTokenizationManager} from "../src/AssetTokenizationManager.sol";
 import {USDC} from "../test/mocks/MockUSDCToken.sol";
+import {EstateVerification} from "../src/Computation/EstateVerification.sol";
 
 contract CreateTokenizedRealEstate is Script {
     function run() external {
         uint256 ownerKey = vm.envUint("PRIVATE_KEY");
-        address asset = 0x51002D2d366779b4C2CEDf817c47fB4eFfa928CE;
+        address asset = 0x402A7859717f8fd0b1b8F806653dA7225E9e45CC;
         vm.startBroadcast(ownerKey);
         
-        address usdc = address(0xC67558CC080A94034E8469146A640209cE3f33E7);
+        address usdc = address(0xCd183631ebBcbd2109DC4a0E5D4D53f7fB3CE65e);
         // address owner = 0x697F5E7a089e1621EA329FE4e906EA45D16E79c6;
-        address owner = 0xF1c8170181364DeD1C56c4361DED2eB47f2eef1b;
+        address owner = 0x42fFD061E73331b2327a37AA306a0356859F9d1C;
         
         USDC(usdc).mint(owner, 1000000e18);
         USDC(usdc).approve(asset, type(uint256).max);
 
-        AssetTokenizationManager.TokenizeFunctionCallRequest memory request;
+        address estateVerification = AssetTokenizationManager(asset).getEstateVerification();
+
+        EstateVerification.TokenizeFunctionCallRequest memory request;
         request.estateOwner = owner;
         request.chainsToDeploy = new uint256[](2);
         request.chainsToDeploy[0] = 43113;
@@ -29,7 +32,7 @@ contract CreateTokenizedRealEstate is Script {
         request.estateOwnerAcrossChain[0] = owner;
         request.estateOwnerAcrossChain[1] = owner;
 
-        uint256 estateCost = 1000;
+        uint256 estateCost = 1e6 * 1e18;
         uint256 percentageToTokenize = 100e18;
         bool isApproved = true;
         bytes memory _saltBytes = bytes("6969");
@@ -37,7 +40,7 @@ contract CreateTokenizedRealEstate is Script {
 
         bytes memory response = abi.encode(estateCost, percentageToTokenize, isApproved, _saltBytes, _verifyingOperator);
 
-        AssetTokenizationManager(asset).createTestRequestIdResponse(request, response);
+        EstateVerification(estateVerification).createTestRequestIdResponse(request, response);
 
         vm.stopBroadcast();
     }

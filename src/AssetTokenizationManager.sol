@@ -344,6 +344,10 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, CcipRequestTypes
         return s_registry;
     }
 
+    function getEstateVerification() external view returns (address) {
+        return address(i_estateVerification);
+    }
+
     function getCollateralDepositedBy(address estateOwner) external view returns (uint256) {
         return s_getCollateralDepositedBy[estateOwner];
     }

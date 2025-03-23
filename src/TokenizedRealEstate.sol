@@ -226,6 +226,10 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         IERC20(i_paymentToken).safeTransfer(msg.sender, reward);
     }
 
+    function updateEstateCost(uint256 newEstateCost) external onlyEstateOwner {
+        s_estateCost = newEstateCost;
+    }
+
     /**
      * 
      * @param rewardsAvailable The amount of rewards available to be distributed
@@ -292,6 +296,8 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         uint256 currentEstateCostOnChain = getCurrentOnChainTokenizedAmount();
         return (currentEstateCostOnChain * PRECISION) / TOTAL_TRE_SUPPLY;
     }
+
+    // 1000 * 1e18 / (1e6 * 1e18) = 1e12
 
     function getEstateOwner() external view returns (address) {
         return i_estateOwner;
