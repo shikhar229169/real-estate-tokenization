@@ -201,8 +201,9 @@ contract RealEstateRegistry is AccessControl, EIP712 {
 
     function forceUpdateOperatorVault(string memory _operatorVaultEns) external onlyRole(DEFAULT_ADMIN_ROLE) {
         address _operator = s_ensToOperator[_operatorVaultEns];
-        require(_operator != address(0), RealEstateRegistry__InvalidENSName());
-        IVerifyingOperatorVault(_operator).upgradeToAndCall(s_verifyingOpVaultImplementation, "");
+        address _vault = s_operators[_operator].vault;
+        require(_vault != address(0), RealEstateRegistry__InvalidENSName());
+        IVerifyingOperatorVault(_vault).upgradeToAndCall(s_verifyingOpVaultImplementation, "");
     }
 
     // @todo 
