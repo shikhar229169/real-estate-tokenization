@@ -61,20 +61,12 @@ contract AssetTokenizationManagerTest is Test {
         MockV3Aggregator aggregator = new MockV3Aggregator(8, 3000e8);
         vm.stopPrank();
 
-        
         token[0] = address(mockToken);
         dataFeeds[0] = address(aggregator);
 
         vm.prank(admin);
         realEstateRegistry = new RealEstateRegistry(
-            slasher,
-            signer,
-            fiatReqForCollateral_RER,
-            token,
-            dataFeeds,
-            vovAddr,
-            address(0),
-            address(0)
+            slasher, signer, fiatReqForCollateral_RER, token, dataFeeds, vovAddr, address(0), address(0)
         );
     }
 
@@ -94,7 +86,7 @@ contract AssetTokenizationManagerTest is Test {
         address vault = realEstateRegistry.getOperatorVault(nodeOperator);
         bool isApproved = realEstateRegistry.getOperatorInfo(nodeOperator).isApproved;
         require(vault != address(0) && isApproved, "Vault not registered");
-        
+
         assert(ERC1967ProxyAutoUp(payable(vault)).getImplementation() == vovAddr);
         console.log(VerifyingOperatorVault(vault).isAutoUpdateEnabled());
     }
@@ -119,7 +111,7 @@ contract AssetTokenizationManagerTest is Test {
 
         console.log("Old:", vovAddr);
         console.log("New:", newVovImplementation);
-        
+
         address vault = realEstateRegistry.getOperatorVault(nodeOperator);
         assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation);
 
@@ -146,7 +138,40 @@ contract AssetTokenizationManagerTest is Test {
         assertEq(ERC1967ProxyAutoUp(payable(vault)).getImplementation(), newVovImplementation2);
     }
 
-    function prepareAndSignSignature(address _nodeOperaror, string memory _ensName) internal view returns (bytes memory _signature) {
+    function test_forceAutoUpgrade() public {
+        bytes memory _signature = prepareAndSignSignature(nodeOperator, "meow");
+
+        vm.startPrank(nodeOperator);
+
+        mockToken.approve(address(realEstateRegistry), 1e18);
+        realEstateRegistry.depositCollateralAndRegisterVault("meow", address(mockToken), _signature, false);
+
+        vm.stopPrank();
+
+        vm.prank(admin);
+        realEstateRegistry.approveOperatorVault("meow");
+
+        VerifyingOperatorVault vault = VerifyingOperatorVault(realEstateRegistry.getOperatorVault(nodeOperator));
+        assertEq(vault.isAutoUpdateEnabled(), false);
+
+        address newVovImplementation = address(new VerifyingOperatorVault());
+
+        vm.prank(admin);
+        realEstateRegistry.updateVOVImplementation(newVovImplementation);
+
+        assertEq(ERC1967ProxyAutoUp(payable(address(vault))).getImplementation(), vovAddr);
+
+        vm.prank(admin);
+        realEstateRegistry.forceUpdateOperatorVault("meow");
+
+        assertEq(ERC1967ProxyAutoUp(payable(address(vault))).getImplementation(), newVovImplementation);
+    }
+
+    function prepareAndSignSignature(address _nodeOperaror, string memory _ensName)
+        internal
+        view
+        returns (bytes memory _signature)
+    {
         bytes32 digest = realEstateRegistry.prepareRegisterVaultHash(_nodeOperaror, _ensName);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerKey, digest);
         _signature = abi.encodePacked(r, s, v);
@@ -165,8 +190,8 @@ contract AssetTokenizationManagerTest is Test {
         realEstateRegistry.approveOperatorVault("meow");
 
         address vault = realEstateRegistry.getOperatorVault(nodeOperator);
-        
-        uint256 moreThanSlippage = 100e18+1;
+
+        uint256 moreThanSlippage = 100e18 + 1;
         vm.startPrank(nodeOperator);
         vm.expectRevert(VerifyingOperatorVault__IncorrectSlippage.selector);
         VerifyingOperatorVault(vault).setMaxSlippage(moreThanSlippage);
@@ -186,7 +211,7 @@ contract AssetTokenizationManagerTest is Test {
     //     realEstateRegistry.approveOperatorVault("meow");
 
     //     address vault = realEstateRegistry.getOperatorVault(nodeOperator);
-        
+
     //     uint256 lessThanSlippage = 100;
     //     vm.startPrank(nodeOperator);
     //     VerifyingOperatorVault(vault).setMaxSlippage(lessThanSlippage);
@@ -284,7 +309,7 @@ contract AssetTokenizationManagerTest is Test {
 
         assertEq(VerifyingOperatorVault(vault).isAutoUpdateEnabled(), true);
     }
-    
+
     function testSetTokenForAnotherChainTokenNotOnBaseChain() public {
         address tokenNotOnBaseChain = makeAddr("tokenNotOnBaseChain");
         uint256 chainId = 11155111;
@@ -359,15 +384,15 @@ contract AssetTokenizationManagerTest is Test {
 
         vm.prank(admin);
         realEstateRegistry.approveOperatorVault("meow");
-        
+
         // address vault = realEstateRegistry.getOperatorVault(nodeOperator);
         bool isApproved = realEstateRegistry.getOperatorInfo(nodeOperator).isApproved;
         require(isApproved, "Vault not registered");
-        
+
         vm.startPrank(slasher);
         realEstateRegistry.slashOperatorVault("meow");
         vm.stopPrank();
-        
+
         isApproved = realEstateRegistry.getOperatorInfo(nodeOperator).isApproved;
         require(!isApproved, "Vault registered");
     }
