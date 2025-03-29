@@ -328,9 +328,9 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, CcipRequestTypes
         return string.concat(_baseURI(), estateTokenUri);
     }
 
-    function getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) external view returns (address[] memory) {
-        return _getAllChainDeploymentAddr(_estateOwner, _estateCost, _percentageToTokenize, _tokenId, _salt, _paymentToken, _chainsToDeploy);
-    }
+    // function getAllChainDeploymentAddr(address[] memory _estateOwner, uint256 _estateCost, uint256 _percentageToTokenize, uint256 _tokenId, bytes32 _salt, address _paymentToken, uint256[] memory _chainsToDeploy) external view returns (address[] memory) {
+    //     return _getAllChainDeploymentAddr(_estateOwner, _estateCost, _percentageToTokenize, _tokenId, _salt, _paymentToken, _chainsToDeploy);
+    // }
 
     function getEstateInfo(uint256 tokenId) external view returns (EstateInfo memory) {
         return s_tokenidToEstateInfo[tokenId];

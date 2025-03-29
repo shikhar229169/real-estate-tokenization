@@ -31,6 +31,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
     error RealEstateRegistry__InvalidENSName();
     error RealEstateRegistry__NativeNotRequired();
     error RealEstateRegistry__InvalidSignature();
+    error RealEstateRegistry__OnlyBaseChain();
 
     // structs
     struct OperatorInfo {
@@ -145,6 +146,7 @@ contract RealEstateRegistry is AccessControl, EIP712 {
         bytes memory _signature, 
         bool _autoUpdateEnabled
     ) external onlyAcceptedToken(_paymentToken) payable {
+        require(block.chainid == 43113 || block.chainid == 43114, RealEstateRegistry__OnlyBaseChain());
         require(!_isOperatorExist(msg.sender), RealEstateRegistry__OperatorAlreadyExist());
         require(s_ensToOperator[_ensName] == address(0), RealEstateRegistry__ENSNameAlreadyExist());
         require(bytes(_ensName).length > 0, RealEstateRegistry__InvalidENSName());

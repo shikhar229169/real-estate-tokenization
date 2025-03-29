@@ -42,6 +42,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     uint256 private s_perEstateTokenRewardStored;
     mapping(address estateTokenHolder => uint256 perTokenRewardClaimed) private s_perEstateTokenRewardClaimedBy;
     mapping(address estateTokenHolder => uint256 rewards) private s_claimableRewards;
+    mapping(address => uint256) private s_claimedRewards;
 
     uint8 private constant MAX_DECIMALS = 18;
     uint256 private constant TOTAL_TRE_SUPPLY = 1e6 * 1e18;
@@ -222,6 +223,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         uint256 reward = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * balanceOf(msg.sender)) / PRECISION;
         s_perEstateTokenRewardClaimedBy[msg.sender] = s_perEstateTokenRewardStored;
         reward += s_claimableRewards[msg.sender];
+        s_claimedRewards[msg.sender] += reward;
         s_claimableRewards[msg.sender] = 0;
         IERC20(i_paymentToken).safeTransfer(msg.sender, reward);
     }
@@ -242,13 +244,14 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         address _registry = AssetTokenizationManager(i_assetTokenizationManager).getRegistry();
         address operatorVault = IRealEstateRegistry(_registry).getOperatorVault(AssetTokenizationManager(i_assetTokenizationManager).getEstateInfo(i_tokenId).verifyingOperator);
 
+        IERC20(i_paymentToken).safeTransferFrom(msg.sender, address(this), rewardsAvailable);
+
         IERC20(i_paymentToken).approve(operatorVault, nodeOperatorVaultReward);
         uint256 amountUtilized = IVerifyingOperatorVault(operatorVault).receiveRewards(i_paymentToken, nodeOperatorVaultReward);
         uint256 leftAmount = nodeOperatorVaultReward - amountUtilized;
         estateHolderRewards += leftAmount;
         IERC20(i_paymentToken).approve(operatorVault, 0);
 
-        IERC20(i_paymentToken).safeTransferFrom(msg.sender, address(this), estateHolderRewards);
         s_perEstateTokenRewardStored += ((estateHolderRewards * PRECISION)  / totalSupply());
         emit RewardsAccumulated(estateHolderRewards, s_perEstateTokenRewardStored);
     }
@@ -297,7 +300,13 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         return (currentEstateCostOnChain * PRECISION) / TOTAL_TRE_SUPPLY;
     }
 
-    // 1000 * 1e18 / (1e6 * 1e18) = 1e12
+    function getClaimableRewards() external view returns (uint256) {
+        return s_claimableRewards[msg.sender];
+    }
+
+    function getClaimedRewards() external view returns (uint256) {
+        return s_claimedRewards[msg.sender];
+    }
 
     function getEstateOwner() external view returns (address) {
         return i_estateOwner;

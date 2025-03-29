@@ -356,4 +356,12 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     function getIsSlashed() external view returns (bool) {
         return s_isSlashed;
     }
+
+    function getTokenizedRealEstate() external view returns (address[] memory) {
+        return s_tokenizedRealEstateAddresses;
+    }
+
+    function getIsTokenizedRealEstate(address _tokenizedRealEstate) external view returns (bool) {
+        return s_isTokenizedRealEstate[_tokenizedRealEstate];
+    }
 }
