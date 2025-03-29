@@ -305,7 +305,8 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     }
 
     function getClaimedRewards() external view returns (uint256) {
-        return s_claimedRewards[msg.sender];
+        uint256 pendingRewards = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * balanceOf(msg.sender)) / PRECISION;
+        return s_claimedRewards[msg.sender] + pendingRewards;
     }
 
     function getEstateOwner() external view returns (address) {
