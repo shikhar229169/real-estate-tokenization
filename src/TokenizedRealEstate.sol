@@ -301,12 +301,12 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
     }
 
     function getClaimableRewards() external view returns (uint256) {
-        return s_claimableRewards[msg.sender];
+        uint256 pendingRewards = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * balanceOf(msg.sender)) / PRECISION;
+        return s_claimableRewards[msg.sender] + pendingRewards;
     }
 
     function getClaimedRewards() external view returns (uint256) {
-        uint256 pendingRewards = ((s_perEstateTokenRewardStored - s_perEstateTokenRewardClaimedBy[msg.sender]) * balanceOf(msg.sender)) / PRECISION;
-        return s_claimedRewards[msg.sender] + pendingRewards;
+        return s_claimedRewards[msg.sender];
     }
 
     function getEstateOwner() external view returns (address) {
