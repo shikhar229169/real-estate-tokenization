@@ -99,6 +99,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         s_collateralDeposited[msg.sender] += collateralAmount;
         emit CollateralDeposited(msg.sender, collateralAmount);
         IERC20(i_paymentToken).safeTransferFrom(msg.sender, address(this), collateralAmount);
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "CollateralDeposited(address user,uint256 collateralAmt)", abi.encode(msg.sender, collateralAmount));
     }
 
     /**
@@ -123,6 +124,8 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         emit EstateOwnershipTokensMinted(msg.sender, tokensToMint);
         s_estateTokenOwnershipMinted[msg.sender] += tokensToMint;
         _mint(msg.sender, tokensToMint);
+
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokensMinted(address user,uint256 tokensToMint)", abi.encode(msg.sender, tokensToMint));
     }
 
     /**
@@ -140,6 +143,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         // send a call to avalanche (base) chain to query for enough mint available
         bytes memory _ccipData = abi.encode(CCIP_REQUEST_MINT_TOKENS, msg.sender, tokensToMint, block.chainid, address(this), i_tokenId, mintIfLess);
         AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "MintTokensFromAnotherChainRequest(address,uint256,uint256,bool)", abi.encode(msg.sender, tokensToMint, block.chainid, mintIfLess));
     }
 
     function mintTokensFromAnotherChainRequest(address _user, uint256 _tokensToMint, uint256 _sourceChainId, bool _mintIfLess) external onlyAssetTokenizationManager updateReward(_user) returns (bool _success, uint256 _tokensMinted) {
@@ -171,9 +175,12 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
             s_estateTokenOwnershipMinted[_user] += _tokensMinted;
             emit EstateOwnershipTokensMinted(_user, _tokensMinted);
             _mint(_user, _tokensMinted);
+            AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokensMinted(address user,uint256 tokensToMint)", abi.encode(_user, _tokensMinted));
         }
         else {
             emit EstateOwnershipTokenMintFailed(_user, _tokensToMint, _tokensMinted);
+            AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokenMintFailed(address user,uint256 tokensToMint,uint256 tokensMintedPossible)", abi.encode(_user, _tokensToMint, _tokensMinted));
+            
         }
     }
 
@@ -183,6 +190,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         s_estateTokenOwnershipMinted[msg.sender] -= tokensToBurn;
         emit EstateOwnershipTokensBurnt(msg.sender, tokensToBurn);
         _burn(msg.sender, tokensToBurn);
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokensBurnt(address user,uint256 tokensToBurn)", abi.encode(msg.sender, tokensToBurn));
     }
 
     function burnEstateOwnershipTokensOnNonBaseChain(uint256 tokensToBurn, uint256 gasLimit) external {
@@ -195,6 +203,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         // send a call to base chain to burn the tokens
         bytes memory _ccipData = abi.encode(CCIP_REQUEST_BURN_TOKENS, msg.sender, tokensToBurn, block.chainid, address(this), i_tokenId);
         AssetTokenizationManager(i_assetTokenizationManager).bridgeRequestFromTRE(_ccipData, gasLimit, BASE_CHAIN_ID, i_tokenId);
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokensBurnt(address user,uint256 tokensToBurn)", abi.encode(msg.sender, tokensToBurn));
     }
 
     function burnTokensFromAnotherChainRequest(address _user, uint256 _tokensToBurn, uint256 _sourceChainId) external onlyAssetTokenizationManager updateReward(_user) {
@@ -202,6 +211,7 @@ contract TokenizedRealEstate is ERC20, CcipRequestTypes {
         s_estateTokenOwnershipMintedForAnotherChain[_user][_sourceChainId] -= _tokensToBurn;
         emit EstateOwnershipTokensBurnt(_user, _tokensToBurn);
         _burn(_user, _tokensToBurn);
+        AssetTokenizationManager(i_assetTokenizationManager).notifyFromTRE(i_tokenId, "EstateOwnershipTokensBurnt(address user,uint256 tokensToBurn)", abi.encode(_user, _tokensToBurn));
     }
 
     function withdrawCollateral(uint256 collateralAmount) external {

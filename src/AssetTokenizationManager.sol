@@ -55,6 +55,7 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, CcipRequestTypes
 
     // events
     event TokenizedRealEstateDeployed(uint256 tokenId, address tokenizedRealEstate, address estateOwner);
+    event TokenizedRealEstateLog(address tre, uint256 tokenId, string emittedEvent, bytes eventEncodedData);
 
     // modifiers
     modifier onlyEstateOwner(uint256 tokenId) {
@@ -152,6 +153,12 @@ contract AssetTokenizationManager is ERC721, EstateAcrossChain, CcipRequestTypes
             s_tokenIdToChainIdToTokenizedRealEstate[_tokenId][_chainId] = _deploymentAddrForOtherChains[i];
             bridgeRequest(_chainId, bridgeData, 26_00_000);
         }
+    }
+
+    function notifyFromTRE(uint256 _tokenId, string memory _event, bytes memory _eventEncodedData) external {
+        address tokenizedRealEstate = s_tokenidToEstateInfo[_tokenId].tokenizedRealEstate;
+        require(msg.sender == tokenizedRealEstate, AssetTokenizationManager__NotAuthorized());
+        emit TokenizedRealEstateLog(tokenizedRealEstate, _tokenId, _event, _eventEncodedData);
     }
 
     function _processCollateralFromEstateOwner(address _estateOwner, address _paymentToken) internal {
