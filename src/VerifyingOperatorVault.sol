@@ -62,7 +62,7 @@ contract VerifyingOperatorVault is Initializable, UUPSUpgradeable, AccessControl
     uint256 private rewardPerTokenStored;
     uint256 private s_stakeDelay;
     uint256 private s_maxSlippage;
-    uint256 private HUNDRED_PC = 100e18;
+    uint256 private constant HUNDRED_PC = 100e18;
     uint256 private constant SWAP_DEADLINE_DELAY = 10 minutes;
     uint24 private constant FEE = 3000;
 
